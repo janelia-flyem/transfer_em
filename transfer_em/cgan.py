@@ -12,7 +12,7 @@
 
 import tensorflow as tf
 import time
-from models.utils import *
+from .models.utils import *
 import matplotlib.pyplot as plt
 import tqdm
 
@@ -177,7 +177,7 @@ class EM2EM(object):
    
             if debug:
                 # progress bar
-                with tqdm(total=num_samples) as pbar
+                with tqdm.tqdm(total=num_samples) as pbar:
                     for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
                         self.train_step(data_f, data_g)
                         pbar.update(1)
@@ -204,31 +204,33 @@ class EM2EM(object):
 
         return self.generator_g(data)
 
-    def generate_images(self, orig, pred):
-        """Display two images.
+def generate_images(orig, pred):
+    """Display two images.
 
-        Note: if the data is 3d, only one the first
-        slice is used.  Only the first image in a batch is used.
+    Note: if the data is 3d, only one the first
+    slice is used.  Only the first image in a batch is used.
 
-        Args:
-            orig (tf.tensor): [b, z-opt, y, x, nch]
-        """
-        
-        orig = orig[0]
-        if tf.rank(orig) == 5:
-            orig = orig[0,0,:,:,:]
-            pred = pred[0,0,:,:,:]
-        else:
-            orig = orig[0]
-            pred = pred[0]
+    Args:
+        orig (tf.tensor): [b, z-opt, y, x, nch]
+    """
+    
+    if orig.shape.rank == 5:
+        orig = orig[0,0,:,:,0]
+        pred = pred[0,0,:,:,0]
+    else:
+        orig = orig[0,:,:,0]
+        pred = pred[0,:,:,0]
 
 
-        plt.figure(figsize=(12, 12))
-        plt.title("input")
-        plt.imshow(orig*0.5 + 0.5) 
-        plt.title("output")
-        plt.imshow(pred*0.5 + 0.5) 
-        plt.axis('off')
-        plt.show()
+    plt.figure(figsize=(12, 12))
+    plt.title("input")
+    plt.subplot(121)
+    plt.imshow(orig*0.5 + 0.5, cmap="gray") 
+    plt.axis('off')
+    plt.title("output")
+    plt.subplot(122)
+    plt.imshow(pred*0.5 + 0.5, cmap="gray") 
+    plt.axis('off')
+    plt.show()
 
 

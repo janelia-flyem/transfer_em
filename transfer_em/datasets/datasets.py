@@ -5,7 +5,7 @@ Note: assume 1 channel data only but allow for 2d or 3d input
 """
 
 import tensorflow as tf
-from tensorflow.datata.experimnent import AUTOTUNE
+from tensorflow.data.experimental import AUTOTUNE
 
 BATCH_SIZE = 64
 EPOCH_SIZE = 4096 # provides a bound for generators
@@ -21,38 +21,29 @@ def augment(tensor):
     """
 
     # get ndims
-    ndims = tf.rank(tensor)
+    ndims = tensor.shape.rank - 1 # don't include channel
     arr = tf.range(0, ndims)
     random_dims = tf.random.shuffle(arr)
-    
+    channel = tf.constant(ndims, shape=[1])
+    random_dims = tf.concat([random_dims, channel], 0)
+
     # transpose
     tensor = tf.transpose(tensor, perm=random_dims)
 
     # perform a random flip
-    arr = tf.range(-ndim-1, ndims)
-    random_flip = tf.random.shuffle(arr)
-    flip_arr = []
-
-    # determine which, if any axes, should be flipped
-    for val in random_flip[0:ndim]:
-        if val < 0:
-            continue
-        flip_arr.append(val)
-    
-    if len(flip_arr) > 0:
-        tensor = tf.reverse(tensor, flip_arr) 
-
+    for dim in range(ndims):
+        uniform_random = tf.random.uniform([], 0, 1.0)
+        if tf.math.less(uniform_random, .5):
+            tensor = tf.reverse(tensor, [dim])
+        
     return tensor
 
-def rescale_tensor(tensor, meanstd):
-    """Rescale tensor based on population statistics.
+def standardize_population(tensor, meanstd):
+    """Standardize tensor based on population statistics.
     """
-    mean1 = tf.math.reduce_mean(tensor)
-    std1 = tf.math.sqrt(tf.math.reduce_variance(tensor))
-    mean2, std2 = meanstd
-
-    tensor *= std2/std1
-    tensor += (mean2-mean1*std2/std1)
+    mean, std = meanstd
+    tensor -= mean
+    tensor /= std
     return tensor
 
 def get_meanstd(dataset):
@@ -84,11 +75,11 @@ def scale_tensor(tensor):
     tensor = tf.cast(tensor, tf.float32)
     tensor = (tensor / 127.5) - 1
     
-    return tf.expand_dims(tensor, tf.rank(tensor))
+    return tf.expand_dims(tensor, tensor.shape.rank)
 
 
 def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE, enable_augmentation=True,
-        global_adjust=True, meanstd=None):
+        global_adjust=True, meanstd=None, randomize=False):
     """Takes a list of numpy arrays (2D or 3D) and creates a tensorflow dataset.
 
     Each element of the dataset is scaled between -1 and 1. 
@@ -96,13 +87,11 @@ def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE,
     """
 
     # load data into dataset and scalee
-    dataset = tf.data.Dataseeet.from_tensor_slices(tensors)
+    dataset = tf.data.Dataset.from_tensor_slices(tensors).map(scale_tensor, num_parallel_calls=AUTOTUNE)
 
     # call custom mapping
     if custom_map is not None:
         dataset = dataset.map(custom_map, num_parallel_calls=AUTOTUNE)
-
-    dataset= dataset.map(scale_tensor, num_parallel_calls=AUTOTUNE)
 
     # use population statistics
     if global_adjust:
@@ -110,10 +99,12 @@ def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE,
             # determine mean and standard deviation
             meanstd = get_meanstd(dataset) # eager execution
         # apply to dataset
-        dataset = dataset.map(lambda x: rescale_tensor(x, meanstd), num_parallel_calls=AUTOTUNE)
+        dataset = dataset.map(lambda x: standardize_population(x, meanstd), num_parallel_calls=AUTOTUNE)
 
     # shuffle dataset and load in cache
-    dataset = dataset.cache().shuffle()
+    dataset = dataset.cache()
+    if randomize:
+        dataset = dataset.shuffle(BUFFER_SIZE)
 
     # apply random augmentation from cache if enabled
     if enable_augmentation:
@@ -146,13 +137,13 @@ def create_dataset_from_generator(generator, custom_map=None, batch_size=BATCH_S
 
     dataset= dataset.map(scale_tensor, num_parallel_calls=AUTOTUNE).take(EPOCH_SIZE)
 
-    # use population statistics to rescale 
+    # use population statistics to standardize to the population 
     if global_adjust:
         if meanstd is None:
             # determine mean and standard deviation
             meanstd = get_meanstd(dataset) # eager execution
         # apply to dataset
-        dataset = dataset.map(lambda: rescale_tensor(meanstd), num_parallel_calls=AUTOTUNE)
+        dataset = dataset.map(lambda: standardize_population(meanstd), num_parallel_calls=AUTOTUNE)
 
     # shuffle dataset, batch, prefetch
     return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd
