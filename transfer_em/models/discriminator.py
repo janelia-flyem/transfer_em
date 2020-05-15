@@ -9,7 +9,7 @@ TODO Allow for constraint network as input
 # to support 3D network and other features.
 
 import tensorflow as tf
-from models.utils import *
+from .utils import *
 
 
 def discriminator(is3d=True, norm_type='instancenorm'):

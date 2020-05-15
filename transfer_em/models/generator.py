@@ -12,19 +12,19 @@ TODO: potentially support multi-scale generator
 
 
 import tensorflow as tf
-from models.utils import *
+from .utils import *
 
 def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
-  """Modified u-net generator model based on https://arxiv.org/abs/1611.07004.
+    """Modified u-net generator model based on https://arxiv.org/abs/1611.07004.
 
-  Args:
-    dimsize: length of each dimentions (must be square or cube)
-    is3d: true=3d tensor; false=2d tensor
-    norm_type: Type of normalization. Either 'batchnorm' or 'instancenorm'.
+      Args:
+        dimsize: length of each dimentions (must be square or cube)
+        is3d: true=3d tensor; false=2d tensor
+        norm_type: Type of normalization. Either 'batchnorm' or 'instancenorm'.
 
-  Returns:
-    Generator model
-  """
+      Returns:
+        Generator model
+    """
 
     initializer = tf.random_normal_initializer(0., 0.02)
     if is3d:

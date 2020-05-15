@@ -46,6 +46,14 @@ def standardize_population(tensor, meanstd):
     tensor /= std
     return tensor
 
+def unstandardize_population(tensor, meanstd):
+    """Undo standardization.
+    """
+    mean, std = meanstd
+    tensor *= std
+    tensor += mean
+    return tensor
+
 def get_meanstd(dataset):
     """Find a global mean and standard deviation for the dataset.
     """

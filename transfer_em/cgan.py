@@ -12,9 +12,11 @@
 
 import tensorflow as tf
 import time
-from .models.utils import *
+from .models.discriminator import *
+from .models.generator import *
 import matplotlib.pyplot as plt
 import tqdm
+from .debug.debug import accuracy
 
 class EM2EM(object):
     """Creates CGAN model for 1-channenl 2d or 3d data and provides functions to train and predict.
@@ -31,11 +33,11 @@ class EM2EM(object):
         # enable parallel training
         #self.strategy = tf.distribute.MirroredStrategy()
         #with self.strategy.scope():
-        self.generator_g = pix2pix.unet_generator(dimsize, is3d, norm_type=norm_type)
-        self.generator_f = pix2pix.unet_generator(dimsize, is3d, norm_type=norm_type)
+        self.generator_g = unet_generator(dimsize, is3d, norm_type=norm_type)
+        self.generator_f = unet_generator(dimsize, is3d, norm_type=norm_type)
 
-        self.discriminator_x = pix2pix.discriminator(norm_type=norm_type, target=False)
-        self.discriminator_y = pix2pix.discriminator(norm_type=norm_type, target=False)
+        self.discriminator_x = discriminator(is3d, norm_type=norm_type)
+        self.discriminator_y = discriminator(is3d, norm_type=norm_type)
 
 
         # create optimizers
@@ -71,7 +73,7 @@ class EM2EM(object):
           self.ckpt.restore(self.ckpt_manager.latest_checkpoint).assert_consumed()
           print ('Latest checkpoint restored!!')
 
-    def make_checkpoint(epoch_num):
+    def make_checkpoint(self, epoch_num):
         path = self.ckpt_manager.save()
         print(f"Saving checkpoint for epoch {epoch_num} at {path}")
 
@@ -86,14 +88,14 @@ class EM2EM(object):
         return total_disc_loss * 0.5
 
     def generator_loss(self, generated):
-        return loss_obj(tf.ones_like(generated), generated)
+        return self.loss_obj(tf.ones_like(generated), generated)
 
     def identity_loss(self, real_image, same_image):
         LAMBDA = 10
         loss = tf.reduce_mean(tf.abs(real_image - same_image))
         return LAMBDA * 0.5 * loss
 
-    def calc_cycle_loss(real_image, cycled_image):
+    def calc_cycle_loss(self, real_image, cycled_image):
         LAMBDA = 10
         loss1 = tf.reduce_mean(tf.abs(real_image - cycled_image))
         return LAMBDA * loss1
@@ -169,8 +171,8 @@ class EM2EM(object):
         """
 
         # enable eager to ease debugging (also could dynamically wrap tf.function(train_step)
-        # if only that function needs to be enabled/disabledd
-        tf.config.run_functions_eagerly(enable_eager)
+        # if only that function needs to be enabled/disabled
+        tf.config.experimental_run_functions_eagerly(enable_eager)
 
         for epoch in range(start, start+epochs):
             start = time.time()
@@ -185,16 +187,16 @@ class EM2EM(object):
                 for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
                     self.train_step(data_f, data_g)
 
-            if (epoch + 1) % 100 == 0:
-                self.make_checkpoint()
+            if (epoch + 1) % 1 == 0:
+                self.make_checkpoint(epoch+1)
                 # show sample image
                 if debug and sample is not None:
                     from IPython.display import clear_output          
                     clear_output(wait=True)
                     sample_pred = self.predict(sample)
                     if sample_gt is not None:
-                        print(f"Accuracy on sample: {debug.accuracy(sample_gt[0], sample_pred[0])}")
-                    self.generate_images(sample, sample_pred)
+                        print(f"Accuracy on sample: {accuracy(sample_gt[0], sample_pred[0])}")
+                    generate_images(sample, sample_pred)
         
             print(f"Time taken for epoch {epoch+1} is {time.time()-start}")
 
@@ -223,13 +225,13 @@ def generate_images(orig, pred):
 
 
     plt.figure(figsize=(12, 12))
-    plt.title("input")
     plt.subplot(121)
-    plt.imshow(orig*0.5 + 0.5, cmap="gray") 
+    plt.title("input")
+    plt.imshow(orig*0.5 + 0.5, cmap="gray", vmin=0, vmax=1) 
     plt.axis('off')
-    plt.title("output")
     plt.subplot(122)
-    plt.imshow(pred*0.5 + 0.5, cmap="gray") 
+    plt.title("output")
+    plt.imshow(pred*0.5 + 0.5, cmap="gray", vmin=0, vmax=1) 
     plt.axis('off')
     plt.show()
 

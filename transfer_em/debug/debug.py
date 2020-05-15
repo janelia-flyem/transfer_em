@@ -26,15 +26,19 @@ def warp_tensor(tensor):
         filters = filters[..., tf.newaxis, tf.newaxis]
         tensor = tf.nn.conv3d(tensor, filters, [1,1,1,1,1], "SAME")
 
-        for holenum in range(num_holes):
-            try:
-                # add random hole
-                xstart = tf.random.unform(shape=[], minval=0, maxval=shape[0], dtype=tf.int64)
-                ystart = tf.random.unform(shape=[], minval=0, maxval=shape[1], dtype=tf.int64)
-                zstart = tf.random.unform(shape=[], minval=0, maxval=shape[2], dtype=tf.int64)
-                tensor[0, xstart:(xstart+5), ystart:(ystart+5), zstart:(zstart+5), 0].assign(tf.zeros([5,5,5]))
-            except Exception:
-                pass
+        # make hole
+        uniform_random = tf.random.uniform([tensor.shape[1]*tensor.shape[2]*tensor.shape[3]], 0, 1.0)
+        uniform_random = tf.reshape(uniform_random, tensor.shape)
+        mask_matrix = tf.where(uniform_random < num_hole_rate, tf.ones_like(tensor), tf.zeros_like(tensor)) 
+    
+        # dilate holes 
+        filters = tf.ones([4,4,4], dtype=tf.float32) 
+        filters = filters[..., tf.newaxis, tf.newaxis]
+        mask_matrix = tf.nn.conv3d(mask_matrix, filters, [1,1,1,1,1], "SAME")
+        
+        # apply mask -- make the "holes" the mean value of the image 
+        mean = tf.math.reduce_mean(tensor)
+        tensor = tf.where(mask_matrix > 0, tf.ones_like(tensor)*mean, tensor)   
     else:
         # 2D blurring
         filters = tf.ones([3,3], dtype=tf.float32) / 9
@@ -51,13 +55,18 @@ def warp_tensor(tensor):
         filters = filters[..., tf.newaxis, tf.newaxis]
         mask_matrix = tf.nn.conv2d(mask_matrix, filters, [1,1,1,1], "SAME")
         
-        # apply mask 
-        tensor = tf.where(mask_matrix > 0, -tf.ones_like(tensor), tensor)   
+        # apply mask -- make the "holes" the mean value of the image 
+        mean = tf.math.reduce_mean(tensor)
+        tensor = tf.where(mask_matrix > 0, tf.ones_like(tensor)*mean, tensor)   
+
 
     return tf.squeeze(tensor, [0])
 
 def accuracy(unwarped_orig_tensor, predicted_tensor):
     """Give accuracy between unwarped tensor and predicted tensor.
     """
+    
+    m = tf.keras.metrics.RootMeanSquaredError() 
+    _ = m.update_state(unwarped_orig_tensor, predicted_tensor)
+    return m.result().numpy()
 
-    return tf.compat.v1.metrics.accuracy(unwarped_orig_tensor, predicted_tensor)
