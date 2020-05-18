@@ -70,7 +70,7 @@ class EM2EM(object):
           print (f"checkpoint {ckpt_restore} restored")
 
         if self.ckpt_manager.latest_checkpoint:
-          self.ckpt.restore(self.ckpt_manager.latest_checkpoint).assert_consumed()
+          self.ckpt.restore(self.ckpt_manager.latest_checkpoint).assert_existing_objects_matched() #.assert_consumed()
           print ('Latest checkpoint restored!!')
 
     def make_checkpoint(self, epoch_num):
