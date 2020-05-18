@@ -66,7 +66,7 @@ class EM2EM(object):
 
         # if a checkpoint exists, restore the latest checkpoint.
         if ckpt_restore is not None:
-          self.ckpt.restore(ckpt_restore).assert_consumed()
+          self.ckpt.restore(ckpt_restore).assert_existing_objects_matched()
           print (f"checkpoint {ckpt_restore} restored")
 
         if self.ckpt_manager.latest_checkpoint:
