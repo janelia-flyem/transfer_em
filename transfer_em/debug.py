@@ -70,3 +70,33 @@ def accuracy(unwarped_orig_tensor, predicted_tensor):
     _ = m.update_state(unwarped_orig_tensor, predicted_tensor)
     return m.result().numpy()
 
+def generate_images(orig, pred):
+    """Display two images.
+
+    Note: if the data is 3d, only one the first
+    slice is used.  Only the first image in a batch is used.
+
+    Args:
+        orig (tf.tensor): [b, z-opt, y, x, nch]
+    """
+    
+    if orig.shape.rank == 5:
+        orig = orig[0,0,:,:,0]
+        pred = pred[0,0,:,:,0]
+    else:
+        orig = orig[0,:,:,0]
+        pred = pred[0,:,:,0]
+
+
+    plt.figure(figsize=(12, 12))
+    plt.subplot(121)
+    plt.title("input")
+    plt.imshow(orig*0.5 + 0.5, cmap="gray", vmin=0, vmax=1) 
+    plt.axis('off')
+    plt.subplot(122)
+    plt.title("output")
+    plt.imshow(pred*0.5 + 0.5, cmap="gray", vmin=0, vmax=1) 
+    plt.axis('off')
+    plt.show()
+
+

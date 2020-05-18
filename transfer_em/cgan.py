@@ -14,9 +14,9 @@ import tensorflow as tf
 import time
 from .models.discriminator import *
 from .models.generator import *
+from .debug import generate_images, accuracy
 import matplotlib.pyplot as plt
 import tqdm
-from .debug.debug import accuracy
 
 class EM2EM(object):
     """Creates CGAN model for 1-channenl 2d or 3d data and provides functions to train and predict.
@@ -205,34 +205,5 @@ class EM2EM(object):
         """
 
         return self.generator_g(data)
-
-def generate_images(orig, pred):
-    """Display two images.
-
-    Note: if the data is 3d, only one the first
-    slice is used.  Only the first image in a batch is used.
-
-    Args:
-        orig (tf.tensor): [b, z-opt, y, x, nch]
-    """
-    
-    if orig.shape.rank == 5:
-        orig = orig[0,0,:,:,0]
-        pred = pred[0,0,:,:,0]
-    else:
-        orig = orig[0,:,:,0]
-        pred = pred[0,:,:,0]
-
-
-    plt.figure(figsize=(12, 12))
-    plt.subplot(121)
-    plt.title("input")
-    plt.imshow(orig*0.5 + 0.5, cmap="gray", vmin=0, vmax=1) 
-    plt.axis('off')
-    plt.subplot(122)
-    plt.title("output")
-    plt.imshow(pred*0.5 + 0.5, cmap="gray", vmin=0, vmax=1) 
-    plt.axis('off')
-    plt.show()
 
 
