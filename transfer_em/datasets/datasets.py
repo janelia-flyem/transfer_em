@@ -121,8 +121,7 @@ def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE,
     # enable prefetch of batches
     return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd
 
- 
-def create_dataset_from_generator(generator, custom_map=None, batch_size=BATCH_SIZE, epoch_size=EPOCH_SIZE,
+def create_dataset_from_generator(generator, shape, custom_map=None, batch_size=BATCH_SIZE, epoch_size=EPOCH_SIZE,
         global_adjust=True, meanstd=None):
     """Takes a function generator that should fetch 2D or 3D data.  Scaling is done if enabled.
     
@@ -137,13 +136,13 @@ def create_dataset_from_generator(generator, custom_map=None, batch_size=BATCH_S
     """
 
     # load data into dataset and scale 
-    dataset = tf.data.Dataset.from_generator(generator, tf.uint8) 
+    dataset = tf.data.Dataset.from_generator(generator, tf.uint8, output_shapes=shape).map(scale_tensor, num_parallel_calls=AUTOTUNE)
 
     # call custom mapping
     if custom_map is not None:
         dataset = dataset.map(custom_map, num_parallel_calls=AUTOTUNE)
 
-    dataset= dataset.map(scale_tensor, num_parallel_calls=AUTOTUNE).take(EPOCH_SIZE)
+    dataset= dataset.take(epoch_size)
 
     # use population statistics to standardize to the population 
     if global_adjust:
@@ -151,7 +150,7 @@ def create_dataset_from_generator(generator, custom_map=None, batch_size=BATCH_S
             # determine mean and standard deviation
             meanstd = get_meanstd(dataset) # eager execution
         # apply to dataset
-        dataset = dataset.map(lambda: standardize_population(meanstd), num_parallel_calls=AUTOTUNE)
+        dataset = dataset.map(lambda x: standardize_population(x, meanstd), num_parallel_calls=AUTOTUNE)
 
     # shuffle dataset, batch, prefetch
     return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd

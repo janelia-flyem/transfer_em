@@ -56,7 +56,7 @@ def discriminator(is3d=True, norm_type='instancenorm'):
     leaky_relu = tf.keras.layers.LeakyReLU()(norm1)
 
     if is3d:
-        last = tf.keras.layers.Conv2D(
+        last = tf.keras.layers.Conv3D(
           1, 3, strides=1,
           kernel_initializer=initializer)(leaky_relu)  # (bs, 28, 28, 1)
     else:

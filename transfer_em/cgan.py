@@ -15,7 +15,6 @@ import time
 from .models.discriminator import *
 from .models.generator import *
 from .debug import generate_images, accuracy
-import matplotlib.pyplot as plt
 import tqdm
 
 class EM2EM(object):
