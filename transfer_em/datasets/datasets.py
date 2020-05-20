@@ -136,7 +136,7 @@ def create_dataset_from_generator(generator, shape, custom_map=None, batch_size=
     """
 
     # load data into dataset and scale 
-    dataset = tf.data.Dataset.from_generator(generator, tf.uint8, output_shapes=shape).map(scale_tensor, num_parallel_calls=AUTOTUNE)
+    dataset = generator.map(scale_tensor, num_parallel_calls=AUTOTUNE)
 
     # call custom mapping
     if custom_map is not None:

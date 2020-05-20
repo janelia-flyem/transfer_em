@@ -4,6 +4,7 @@
 import requests
 import numpy as np
 import tensorflow as tf
+from tensorflow.data.experimental import AUTOTUNE
 
 def fetch_raw_dvid(server, uuid, instance, box_zyx, session):
     """
@@ -61,15 +62,14 @@ def fetch_raw_dvid(server, uuid, instance, box_zyx, session):
     return a.reshape(shape_zyx)
 
 
-def volume3d_dvid(dvid_server, uuid, instance, bbox, size=32, seed=None):
-    """Returns a generator that will produce an infinite number of 3D volumes
+def volume3d_dvid(dvid_server, uuid, instance, bbox, size=64, seed=None):
+    """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from DVID.
 
     Note: only support uint8blk.
     """
 
     def generator():
-        session = requests.Session()
         
         # make repeatable if a seed is set
         if seed is not None:
@@ -80,9 +80,20 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=32, seed=None):
             xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
             ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
             zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
-            yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
+            yield (xstart, ystart, zstart)
+            #yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
+    
+    def mapper(xstart, ystart, zstart):
+        session = requests.Session()
+        return tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
 
-    return generator
+    def wrapper_mapper(x, y, z):
+        tensor = tf.py_function(func = mapper, inp=(x,y,z), Tout = tf.uint8)
+        tensor.set_shape((size, size, size))
+        return tensor
+
+    return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
+
 
 def volume3d_ng(location, size=32):
     """Returns a generator that will prodduce an infinite number of 3D volumes
