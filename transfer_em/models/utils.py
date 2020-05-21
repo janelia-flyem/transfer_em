@@ -59,11 +59,11 @@ def downsample(filters, size, is3d, norm_type='batchnorm', apply_norm=True):
 
     if is3d:
         result.add(
-            tf.keras.layers.Conv3D(filters, size, strides=2, padding='same',
+            tf.keras.layers.Conv3D(filters, size, strides=2, padding='valid',
                              kernel_initializer=initializer, use_bias=False))
     else:
         result.add(
-            tf.keras.layers.Conv2D(filters, size, strides=2, padding='same',
+            tf.keras.layers.Conv2D(filters, size, strides=2, padding='valid',
                              kernel_initializer=initializer, use_bias=False))
 
     if apply_norm:

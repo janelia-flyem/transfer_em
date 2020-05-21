@@ -32,12 +32,15 @@ class EM2EM(object):
         # enable parallel training
         #self.strategy = tf.distribute.MirroredStrategy()
         #with self.strategy.scope():
-        self.generator_g = unet_generator(dimsize, is3d, norm_type=norm_type)
-        self.generator_f = unet_generator(dimsize, is3d, norm_type=norm_type)
+        self.generator_g, dimsize2 = unet_generator(dimsize, is3d, norm_type=norm_type)
+        self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type)
 
+        # dimsize2 should always be even
+        assert((dimsize2 % 2) == 0)
+
+        self.buffer = (dimsize - dimsize2) // 2
         self.discriminator_x = discriminator(is3d, norm_type=norm_type)
         self.discriminator_y = discriminator(is3d, norm_type=norm_type)
-
 
         # create optimizers
         self.generator_g_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
@@ -45,6 +48,7 @@ class EM2EM(object):
 
         self.discriminator_x_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
         self.discriminator_y_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+        self.is3d = is3d
 
         # setup loss functions
         self.loss_obj = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -109,17 +113,40 @@ class EM2EM(object):
             # Generator F translates Y -> X.
 
             fake_y = self.generator_g(real_x, training=True)
-            cycled_x = self.generator_f(fake_y, training=True)
+
+            crop_func = tf.keras.layers.Cropping2D
+            pad_func = tf.keras.layers.ZeroPadding2D
+            if self.is3d:
+                crop_func = tf.keras.layers.Cropping3D
+                pad_func = tf.keras.layers.ZeroPadding3D
+
+            # pad fake data to ensure no off by one issues
+            fake_y_pad = pad_func(padding=self.buffer)(fake_y)
+            cycled_x = self.generator_f(fake_y_pad, training=True)
+            cycled_x_cropped = crop_func(cropping=(self.buffer))(cycled_x)
+            # double crop
+            real_x_cropped2x = crop_func(cropping=(self.buffer*2))(real_x) 
 
             fake_x = self.generator_f(real_y, training=True)
-            cycled_y = self.generator_g(fake_x, training=True)
+            
+            # pad fake data to ensure no off by one issues
+            fake_x_pad = pad_func(padding=self.buffer)(fake_x)
+            cycled_y = self.generator_g(fake_x_pad, training=True)
+            cycled_y_cropped = crop_func(cropping=(self.buffer))(cycled_y)
+            # double crop
+            real_y_cropped2x = crop_func(cropping=(self.buffer*2))(real_y) 
 
             # same_x and same_y are used for identity loss.
             same_x = self.generator_f(real_x, training=True)
+            # crop real_x
+            real_x_cropped = crop_func(cropping=(self.buffer))(real_x) 
+            
             same_y = self.generator_g(real_y, training=True)
+            # crop real_y
+            real_y_cropped = crop_func(cropping=(self.buffer))(real_y) 
 
-            disc_real_x = self.discriminator_x(real_x, training=True)
-            disc_real_y = self.discriminator_y(real_y, training=True)
+            disc_real_x = self.discriminator_x(real_x_cropped, training=True)
+            disc_real_y = self.discriminator_y(real_y_cropped, training=True)
 
             disc_fake_x = self.discriminator_x(fake_x, training=True)
             disc_fake_y = self.discriminator_y(fake_y, training=True)
@@ -128,11 +155,12 @@ class EM2EM(object):
             gen_g_loss = self.generator_loss(disc_fake_y)
             gen_f_loss = self.generator_loss(disc_fake_x)
 
-            total_cycle_loss = self.calc_cycle_loss(real_x, cycled_x) + self.calc_cycle_loss(real_y, cycled_y)
+            # double crop real_y and real_x
+            total_cycle_loss = self.calc_cycle_loss(real_x_cropped2x, cycled_x_cropped) + self.calc_cycle_loss(real_y_cropped2x, cycled_y_cropped)
 
             # Total generator loss = adversarial loss + cycle loss
-            total_gen_g_loss = gen_g_loss + total_cycle_loss + self.identity_loss(real_y, same_y)
-            total_gen_f_loss = gen_f_loss + total_cycle_loss + self.identity_loss(real_x, same_x)
+            total_gen_g_loss = gen_g_loss + total_cycle_loss + self.identity_loss(real_y_cropped, same_y)
+            total_gen_f_loss = gen_f_loss + total_cycle_loss + self.identity_loss(real_x_cropped, same_x)
 
             disc_x_loss = self.discriminator_loss(disc_real_x, disc_fake_x)
             disc_y_loss = self.discriminator_loss(disc_real_y, disc_fake_y)
@@ -194,7 +222,11 @@ class EM2EM(object):
                     clear_output(wait=True)
                     sample_pred = self.predict(sample)
                     if sample_gt is not None:
-                        print(f"Accuracy on sample: {accuracy(sample_gt[0], sample_pred[0])}")
+                        crop_func = tf.keras.layers.Cropping2D
+                        if self.is3d:
+                            crop_func = tf.keras.layers.Cropping3D
+                        sample_gt_cropped = crop_func(cropping=(self.buffer))(sample_gt)
+                        print(f"Accuracy on sample: {accuracy(sample_gt_cropped[0], sample_pred[0])}")
                     generate_images(sample, sample_pred)
         
             print(f"Time taken for epoch {epoch+1} is {time.time()-start}")

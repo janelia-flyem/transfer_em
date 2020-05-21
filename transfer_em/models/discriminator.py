@@ -34,19 +34,19 @@ def discriminator(is3d=True, norm_type='instancenorm'):
     x = inp
 
     # 2d (example sizes shown for starting 256x256) or 3d downsample
-    down1 = downsample(64, 4, is3d, norm_type, False)(x)  # (bs, 128, 128, 64)
-    down2 = downsample(128, 4, is3d, norm_type)(down1)  # (bs, 64, 64, 128)
-    down3 = downsample(256, 4, is3d, norm_type)(down2)  # (bs, 32, 32, 256)
+    down1 = downsample(64, 4, is3d, norm_type, False)(x)  # (bs, 127, 127, 64)
+    down2 = downsample(128, 4, is3d, norm_type)(down1)  # (bs, 62, 62, 128)
+    down3 = downsample(256, 4, is3d, norm_type)(down2)  # (bs, 30, 30, 256)
 
     # valid convolution
     if is3d:
         conv = tf.keras.layers.Conv3D(
           512, 3, strides=1, kernel_initializer=initializer,
-          use_bias=False)(down3)  # (bs, 30, 30, 512)
+          use_bias=False)(down3)  # (bs, 28, 28, 512)
     else:
         conv = tf.keras.layers.Conv2D(
           512, 3, strides=1, kernel_initializer=initializer,
-          use_bias=False)(down3)  # (bs, 30, 30, 512)
+          use_bias=False)(down3)  # (bs, 28, 28, 512)
 
     if norm_type.lower() == 'batchnorm':
         norm1 = tf.keras.layers.BatchNormalization()(conv)
@@ -58,11 +58,11 @@ def discriminator(is3d=True, norm_type='instancenorm'):
     if is3d:
         last = tf.keras.layers.Conv3D(
           1, 3, strides=1,
-          kernel_initializer=initializer)(leaky_relu)  # (bs, 28, 28, 1)
+          kernel_initializer=initializer)(leaky_relu)  # (bs, 26, 26, 1)
     else:
         last = tf.keras.layers.Conv2D(
           1, 3, strides=1,
-          kernel_initializer=initializer)(leaky_relu)  # (bs, 28, 28, 1)
+          kernel_initializer=initializer)(leaky_relu)  # (bs, 26, 26, 1)
 
     return tf.keras.Model(inputs=inp, outputs=last)
 

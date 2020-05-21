@@ -27,6 +27,7 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     """
 
     initializer = tf.random_normal_initializer(0., 0.02)
+
     if is3d:
         last = tf.keras.layers.Conv3DTranspose(
             1, 4, strides=2,
@@ -54,31 +55,47 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     curr_width = 64
 
     # keep downsampling until 1x1x1
-    curr_size = (curr_size + 1) // 2
     x = downsample(curr_width, 4, is3d, norm_type, apply_norm=False)(x)
-    skips.append((x, curr_width))
-    while curr_size > 1:
-        curr_width * 2
-        curr_size = (curr_size + 1) // 2
+    curr_size = (curr_size // 2) - 1
+    
+    skips.append((x, curr_width, curr_size))
+    while curr_size > 16:
+        curr_width *= 2
         if curr_width > max_width:
             curr_width = max_width
         x = downsample(curr_width, 4, is3d, norm_type)(x)
-        skips.append((x, curr_width))
+        curr_size = (curr_size // 2) - 1
+        skips.append((x, curr_width, curr_size))
 
     skips = reversed(skips[:-1])
 
     # Upsampling and establishing the skip connections
     dcount = 0
-    for (skip, curr_width) in skips:
+    for (skip, curr_width, old_size) in skips:
         # only do drop-up for first 3 layers
         dcount += 1
         dropout = (dcount <= 3)
         x = upsample(curr_width, 4, is3d, norm_type, apply_dropout=dropout)(x)
-        x = concat([x, skip])
+        
+        # only copy voxels within the current window size
+        curr_size *= 2
+        crop1 = (old_size - curr_size) // 2
+        crop2 = crop1
+        if ((old_size - curr_size) % 2) > 0:
+            crop2 = crop1 + 1
+        if is3d:
+            skip_cropped = tf.keras.layers.Cropping3D(
+                cropping=((crop1,crop2), (crop1,crop2), (crop1,crop2)))(skip) 
+        else:
+            skip_cropped = tf.keras.layers.Cropping2D(
+                cropping=((crop1,crop2), (crop1,crop2)))(skip)
+        x = concat([x, skip_cropped])
 
+    # no initial convolutions are performed, so the last upsample
+    # has no crop and copy
     x = last(x)
+    curr_size *= 2
 
-    return tf.keras.Model(inputs=inputs, outputs=x)
-
+    return tf.keras.Model(inputs=inputs, outputs=x), curr_size
 
 
