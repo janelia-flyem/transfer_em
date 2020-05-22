@@ -55,15 +55,17 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     curr_width = 64
 
     # keep downsampling until 1x1x1
-    x = downsample(curr_width, 4, is3d, norm_type, apply_norm=False)(x)
+    x = downsample(1, curr_width, 4, is3d, norm_type, apply_norm=False)(x)
     curr_size = (curr_size // 2) - 1
     
     skips.append((x, curr_width, curr_size))
+    iter1 = 2
     while curr_size > 16:
         curr_width *= 2
         if curr_width > max_width:
             curr_width = max_width
-        x = downsample(curr_width, 4, is3d, norm_type)(x)
+        x = downsample(iter1, curr_width, 4, is3d, norm_type)(x)
+        iter1 += 1
         curr_size = (curr_size // 2) - 1
         skips.append((x, curr_width, curr_size))
 
@@ -71,12 +73,13 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
 
     # Upsampling and establishing the skip connections
     dcount = 0
+    iter1 = 1
     for (skip, curr_width, old_size) in skips:
         # only do drop-up for first 3 layers
         dcount += 1
         dropout = (dcount <= 3)
-        x = upsample(curr_width, 4, is3d, norm_type, apply_dropout=dropout)(x)
-        
+        x = upsample(iter1, curr_width, 4, is3d, norm_type, apply_dropout=dropout)(x)
+        iter1 += 1 
         # only copy voxels within the current window size
         curr_size *= 2
         crop1 = (old_size - curr_size) // 2

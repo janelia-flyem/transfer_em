@@ -34,9 +34,9 @@ def discriminator(is3d=True, norm_type='instancenorm'):
     x = inp
 
     # 2d (example sizes shown for starting 256x256) or 3d downsample
-    down1 = downsample(64, 4, is3d, norm_type, False)(x)  # (bs, 127, 127, 64)
-    down2 = downsample(128, 4, is3d, norm_type)(down1)  # (bs, 62, 62, 128)
-    down3 = downsample(256, 4, is3d, norm_type)(down2)  # (bs, 30, 30, 256)
+    down1 = downsample(1, 64, 4, is3d, norm_type, False)(x)  # (bs, 127, 127, 64)
+    down2 = downsample(2, 128, 4, is3d, norm_type)(down1)  # (bs, 62, 62, 128)
+    down3 = downsample(3, 256, 4, is3d, norm_type)(down2)  # (bs, 30, 30, 256)
 
     # valid convolution
     if is3d:

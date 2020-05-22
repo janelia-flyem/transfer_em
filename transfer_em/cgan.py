@@ -190,6 +190,17 @@ class EM2EM(object):
         self.discriminator_y_optimizer.apply_gradients(zip(discriminator_y_gradients,
                                                 self.discriminator_y.trainable_variables))
 
+
+    def plot_discriminator(self, location):
+        """Plot discriminator.
+        """
+        tf.keras.utils.plot_model(self.discriminator_x, show_shapes=True, expand_nested=True, to_file=location)
+
+    def plot_generator(self, location):
+        """Plot generator.
+        """
+        tf.keras.utils.plot_model(self.generator_f, show_shapes=True, expand_nested=True, to_file=location)
+    
     def train(self, train_input, train_target, epochs=3000, start=0, debug=False, sample=None, sample_gt=None, enable_eager=False, num_samples=4096):
         """Main function for training model.  This can be run iteratively but re-training will overwrite
         previous saved checkpoints unless 'start' is set.
