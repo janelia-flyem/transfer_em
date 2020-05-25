@@ -87,15 +87,22 @@ def scale_tensor(tensor):
 
 
 def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE, enable_augmentation=True,
-        global_adjust=True, meanstd=None, randomize=False):
+        global_adjust=True, meanstd=None, randomize=False, padding=None):
     """Takes a list of numpy arrays (2D or 3D) and creates a tensorflow dataset.
 
     Each element of the dataset is scaled between -1 and 1. 
     Global rescaling and augmentation is done if enabled.
     """
+    
+    # load data into dataset
+    dataset = tf.data.Dataset.from_tensor_slices(tensors)
+    
+    # reflection pad
+    if padding is not None:
+        dataset = dataset.map(lambda x: tf.pad(x, padding, "REFLECT"), num_parallel_calls=AUTOTUNE)
 
-    # load data into dataset and scalee
-    dataset = tf.data.Dataset.from_tensor_slices(tensors).map(scale_tensor, num_parallel_calls=AUTOTUNE)
+    # scale
+    dataset = dataset.map(scale_tensor, num_parallel_calls=AUTOTUNE)
 
     # call custom mapping
     if custom_map is not None:
@@ -122,7 +129,7 @@ def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE,
     return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd
 
 def create_dataset_from_generator(generator, shape, custom_map=None, batch_size=BATCH_SIZE, epoch_size=EPOCH_SIZE,
-        global_adjust=True, meanstd=None):
+        global_adjust=True, meanstd=None, padding=None):
     """Takes a function generator that should fetch 2D or 3D data.  Scaling is done if enabled.
     
     In this approach, the generator should be able to fetch an arbitrarily large number
@@ -134,9 +141,14 @@ def create_dataset_from_generator(generator, shape, custom_map=None, batch_size=
     This slightly hacky way of generating datasets has the advantage of using parallelization
     when mapping.
     """
+    
+    # reflection pad
+    if padding is not None:
+        dataset = generator.map(lambda x: tf.pad(x, padding, "REFLECT"), num_parallel_calls=AUTOTUNE)
 
     # load data into dataset and scale 
     dataset = generator.map(scale_tensor, num_parallel_calls=AUTOTUNE)
+    
 
     # call custom mapping
     if custom_map is not None:

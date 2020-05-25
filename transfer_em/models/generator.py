@@ -33,7 +33,7 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
 
     # dimsize must be valid at least for the generator
     # (this is also valid for discriminator)
-    if dimsize not int VALID_DIMS:
+    if dimsize not in VALID_DIMS:
         raise RuntimeError(f"{dimsize} does not allow for valid convolutions")
 
     initializer = tf.random_normal_initializer(0., 0.02)

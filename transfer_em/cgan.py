@@ -42,7 +42,6 @@ class EM2EM(object):
         self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type)
         # dimsize2 should always be even
         assert((dimsize2 % 2) == 0)
-        print(dimsize, dimsize2)
         self.buffer = (dimsize - dimsize2) // 2
 
         # create optimizers
@@ -148,7 +147,6 @@ class EM2EM(object):
             # crop real_y
             real_y_cropped = crop_func(cropping=(self.buffer))(real_y) 
 
-            print(real_x_cropped.shape)
             disc_real_x = self.discriminator_x(real_x_cropped, training=True)
             disc_real_y = self.discriminator_y(real_y_cropped, training=True)
 
