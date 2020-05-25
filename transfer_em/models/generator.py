@@ -14,6 +14,11 @@ TODO: potentially support multi-scale generator
 import tensorflow as tf
 from .utils import *
 
+# technically invalid sizes will still work but off-by-one problems could arise
+VALID_DIMS = [132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452, 460, 468, 476, 484, 492, 500, 508]
+
+VALID_OUT = [76, 84, 92, 100, 108, 116, 124, 132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452]
+
 def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     """Modified u-net generator model based on https://arxiv.org/abs/1611.07004.
 
@@ -25,6 +30,11 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
       Returns:
         Generator model
     """
+
+    # dimsize must be valid at least for the generator
+    # (this is also valid for discriminator)
+    if dimsize not int VALID_DIMS:
+        raise RuntimeError(f"{dimsize} does not allow for valid convolutions")
 
     initializer = tf.random_normal_initializer(0., 0.02)
 

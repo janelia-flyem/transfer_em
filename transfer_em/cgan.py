@@ -29,6 +29,9 @@ class EM2EM(object):
         """Create model.
         """
 
+        if dimsize < 132:
+            raise RuntimeError("minimum dimension allowed is 132")
+
         # enable parallel training
         #self.strategy = tf.distribute.MirroredStrategy()
         #with self.strategy.scope():
