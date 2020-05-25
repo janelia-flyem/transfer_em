@@ -32,15 +32,15 @@ class EM2EM(object):
         # enable parallel training
         #self.strategy = tf.distribute.MirroredStrategy()
         #with self.strategy.scope():
-        self.generator_g, dimsize2 = unet_generator(dimsize, is3d, norm_type=norm_type)
-        self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type)
-
-        # dimsize2 should always be even
-        assert((dimsize2 % 2) == 0)
-
-        self.buffer = (dimsize - dimsize2) // 2
         self.discriminator_x = discriminator(is3d, norm_type=norm_type)
         self.discriminator_y = discriminator(is3d, norm_type=norm_type)
+        
+        self.generator_g, dimsize2 = unet_generator(dimsize, is3d, norm_type=norm_type)
+        self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type)
+        # dimsize2 should always be even
+        assert((dimsize2 % 2) == 0)
+        print(dimsize, dimsize2)
+        self.buffer = (dimsize - dimsize2) // 2
 
         # create optimizers
         self.generator_g_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
@@ -145,6 +145,7 @@ class EM2EM(object):
             # crop real_y
             real_y_cropped = crop_func(cropping=(self.buffer))(real_y) 
 
+            print(real_x_cropped.shape)
             disc_real_x = self.discriminator_x(real_x_cropped, training=True)
             disc_real_y = self.discriminator_y(real_y_cropped, training=True)
 

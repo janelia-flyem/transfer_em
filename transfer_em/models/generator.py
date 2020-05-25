@@ -29,62 +29,46 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     initializer = tf.random_normal_initializer(0., 0.02)
 
     if is3d:
-        last = tf.keras.layers.Conv3DTranspose(
-            1, 4, strides=2,
-            padding='same', kernel_initializer=initializer,
-            activation='tanh') 
-    else:
-        last = tf.keras.layers.Conv2DTranspose(
-            1, 4, strides=2,
-            padding='same', kernel_initializer=initializer,
-            activation='tanh')  # (bs, 256, 256, 3)
-
-    concat = tf.keras.layers.Concatenate()
-
-    if is3d:
         inputs = tf.keras.layers.Input(shape=[None, None, None, 1])
     else:
         inputs = tf.keras.layers.Input(shape=[None, None, 1])
 
     x = inputs
 
-    # Downsampling through the model
-    skips = []
-    curr_size = dimsize
-    max_width = 512
-    curr_width = 64
+    curr_dim = dimsize
 
-    # keep downsampling until 1x1x1
-    x = downsample(1, curr_width, 4, is3d, norm_type, apply_norm=False)(x)
-    curr_size = (curr_size // 2) - 1
-    
-    skips.append((x, curr_width, curr_size))
-    iter1 = 2
-    while curr_size > 16:
-        curr_width *= 2
-        if curr_width > max_width:
-            curr_width = max_width
-        x = downsample(iter1, curr_width, 4, is3d, norm_type)(x)
-        iter1 += 1
-        curr_size = (curr_size // 2) - 1
-        skips.append((x, curr_width, curr_size))
+    # downsample 4 time
+    down, skip = downsample("1", 1, 64, is3d, apply_norm=False)
+    skip0 = skip(inputs)
+    down1 = down(inputs)
+    curr_dim = curr_dim - 2
+    skip0_dim = curr_dim
+    curr_dim = (curr_dim // 2) - 1
 
-    skips = reversed(skips[:-1])
+    down, skip = downsample("2", 64, 128, is3d, norm_type=norm_type)
+    skip1 = skip(down1)
+    down2 = down(down1)
+    curr_dim = curr_dim - 2
+    skip1_dim = curr_dim
+    curr_dim = (curr_dim // 2) - 1
+   
+    down, skip = downsample("3", 128, 256, is3d, norm_type=norm_type)
+    skip2 = skip(down2)
+    down3 = down(down2)
+    curr_dim = curr_dim - 2
+    skip2_dim = curr_dim
+    curr_dim = (curr_dim // 2) - 1
 
-    # Upsampling and establishing the skip connections
-    dcount = 0
-    iter1 = 1
-    for (skip, curr_width, old_size) in skips:
-        # only do drop-up for first 3 layers
-        dcount += 1
-        dropout = (dcount <= 3)
-        x = upsample(iter1, curr_width, 4, is3d, norm_type, apply_dropout=dropout)(x)
-        iter1 += 1 
-        # only copy voxels within the current window size
-        curr_size *= 2
-        crop1 = (old_size - curr_size) // 2
+    #down, skip = downsample("4", 256, 512, is3d, norm_type=norm_type)
+    #skip3 = skip(down3)
+    #down4 = down(down3)
+    #skip3_dim = curr_dim - 2
+    #curr_dim = (curr_dim // 2) - 1
+
+    def concat(x, skip, dim_dn, dim_up):
+        crop1 = (dim_dn - dim_up) // 2
         crop2 = crop1
-        if ((old_size - curr_size) % 2) > 0:
+        if ((dim_dn - dim_up) % 2) > 0:
             crop2 = crop1 + 1
         if is3d:
             skip_cropped = tf.keras.layers.Cropping3D(
@@ -92,13 +76,34 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
         else:
             skip_cropped = tf.keras.layers.Cropping2D(
                 cropping=((crop1,crop2), (crop1,crop2)))(skip)
-        x = concat([x, skip_cropped])
+        x = tf.keras.layers.Concatenate()([x, skip_cropped])
+        return x
 
-    # no initial convolutions are performed, so the last upsample
-    # has no crop and copy
-    x = last(x)
-    curr_size *= 2
+    # upsample 4 timee
+    #up3 = upsample("4", 512, 512, is3d, norm_type=norm_type, apply_dropout=True)(down4)
+    #curr_dim = (curr_dim - 2) * 2 
+    #up3_cat = concat(up3, skip3, skip3_dim, curr_dim)
 
-    return tf.keras.Model(inputs=inputs, outputs=x), curr_size
+    up2 = upsample("3", 256, 256, is3d, norm_type=norm_type, apply_dropout=True)(down3)
+    #up2 = upsample("3", 1024, 256, is3d, norm_type=norm_type, apply_dropout=True)(up3_cat)
+    curr_dim = (curr_dim - 2) * 2 
+    up2_cat = concat(up2, skip2, skip2_dim, curr_dim)
+    
+    up1 = upsample("2", 512, 128, is3d, norm_type=norm_type, apply_dropout=True)(up2_cat)
+    curr_dim = (curr_dim - 2) * 2 
+    up1_cat = concat(up1, skip1, skip1_dim, curr_dim)
+    
+    up0 = upsample("1", 256, 64, is3d, norm_type=norm_type, apply_dropout=True)(up1_cat)
+    curr_dim = (curr_dim - 2) * 2 
+    up0_cat = concat(up0, skip0, skip0_dim, curr_dim)
+
+    # add a 1x1 convolution ad the end instad? 
+    if is3d:
+        x = tf.keras.layers.Conv3D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
+    else:
+        x = tf.keras.layers.Conv2D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
+    curr_dim -= 2
+
+    return tf.keras.Model(inputs=inputs, outputs=x), curr_dim
 
 

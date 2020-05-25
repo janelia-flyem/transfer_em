@@ -33,10 +33,13 @@ def discriminator(is3d=True, norm_type='instancenorm'):
         inp = tf.keras.layers.Input(shape=[None, None, 1], name='input_image')
     x = inp
 
-    # 2d (example sizes shown for starting 256x256) or 3d downsample
-    down1 = downsample(1, 64, 4, is3d, norm_type, False)(x)  # (bs, 127, 127, 64)
-    down2 = downsample(2, 128, 4, is3d, norm_type)(down1)  # (bs, 62, 62, 128)
-    down3 = downsample(3, 256, 4, is3d, norm_type)(down2)  # (bs, 30, 30, 256)
+    # 3 downsamples (conv + strided conv downsample)
+    down, _ = downsample("1", 1, 64, is3d, norm_type=norm_type, apply_norm=False)
+    down1 = down(x)
+    down, _ = downsample("2", 64, 128, is3d, norm_type=norm_type)
+    down2 = down(down1)
+    down, _ = downsample("3", 128, 256, is3d, norm_type=norm_type)
+    down3 = down(down2)
 
     # valid convolution
     if is3d:
@@ -57,11 +60,11 @@ def discriminator(is3d=True, norm_type='instancenorm'):
 
     if is3d:
         last = tf.keras.layers.Conv3D(
-          1, 3, strides=1,
+          1, 1, strides=1,
           kernel_initializer=initializer)(leaky_relu)  # (bs, 26, 26, 1)
     else:
         last = tf.keras.layers.Conv2D(
-          1, 3, strides=1,
+          1, 1, strides=1,
           kernel_initializer=initializer)(leaky_relu)  # (bs, 26, 26, 1)
 
     return tf.keras.Model(inputs=inp, outputs=last)

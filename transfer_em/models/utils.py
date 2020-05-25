@@ -38,14 +38,16 @@ class InstanceNormalization(tf.keras.layers.Layer):
         return self.scale * normalized + self.offset
 
 
-def downsample(id, filters, size, is3d, norm_type='batchnorm', apply_norm=True):
+def downsample(id, infilters, outfilters, is3d, filter_size=4, norm_type='instancenorm', apply_norm=True):
     """Downsamples an input.
 
-    Conv2D => Batchnorm => LeakyRelu
+    Conv2D => norm => LeakyRelu => Conv2D-down => Batchnorm => LeakyRelu
 
     Args:
-        filters: number of filters
-        size: filter size
+        id: name of modeel
+        infilters: number of input filters
+        outfilters: number of output filters
+        filter_size: filter size for downsampling
         is3d: true=3d tensor; false=2d tensor
         norm_type: Normalization type; either 'batchnorm' or 'instancenorm'.
         apply_norm: If True, adds the batchnorm layer
@@ -55,36 +57,42 @@ def downsample(id, filters, size, is3d, norm_type='batchnorm', apply_norm=True):
     """
     initializer = tf.random_normal_initializer(0., 0.02)
 
-    result = tf.keras.Sequential(name=f"Downsample_{id}")
-
     if is3d:
-        result.add(
-            tf.keras.layers.Conv3D(filters, size, strides=2, padding='valid',
-                             kernel_initializer=initializer, use_bias=False), name="conv3down")
+        convlayer = tf.keras.layers.Conv3D
+        inp = tf.keras.layers.Input(shape=[None, None, None, infilters], name='input_image')
     else:
-        result.add(
-            tf.keras.layers.Conv2D(filters, size, strides=2, padding='valid',
-                             kernel_initializer=initializer, use_bias=False, name="conv2down"))
+        convlayer = tf.keras.layers.Conv2D
+        inp = tf.keras.layers.Input(shape=[None, None, infilters], name='input_image')
 
-    if apply_norm:
-        if norm_type.lower() == 'batchnorm':
-            result.add(tf.keras.layers.BatchNormalization())
-        elif norm_type.lower() == 'instancenorm':
-            result.add(InstanceNormalization(is3d))
+    if norm_type.lower() == 'batchnorm':
+        normlayer = tf.keras.layers.BatchNormalization
+    elif norm_type.lower() == 'instancenorm':
+        normlayer = lambda x: InstanceNormalization(is3d)(x)
 
-    result.add(tf.keras.layers.LeakyReLU())
+    # perform convolution
+    conv = convlayer(outfilters, 3, strides=1, padding="valid",
+            kernel_initializer=initializer, use_bias=False)(inp)
+    norm1 = normlayer(conv)
+    before_down = tf.keras.layers.LeakyReLU()(norm1)
+    
+    # perform downsample 
+    conv = convlayer(outfilters, filter_size, strides=2, kernel_initializer=initializer, use_bias=False)(before_down)
+    norm1 = normlayer(conv)
+    last = tf.keras.layers.LeakyReLU()(norm1)
+    
+    return tf.keras.Model(inputs=inp, outputs=last, name=f"Downsample_{id}"), tf.keras.Model(inputs=inp, outputs=before_down)
 
-    return result
 
 
-def upsample(id, filters, size, is3d, norm_type='batchnorm', apply_dropout=False):
-    """Upsamples an input.
+def upsample(id, infilters, outfilters, is3d, filter_size=4, norm_type='instancenorm', apply_dropout=True):
+    """Upsamples an input (returns same number of filters after doubling and halving.
 
     Conv2DTranspose => Batchnorm => Dropout => Relu
 
     Args:
-        filters: number of filters
-        size: filter size
+        infilters: number of input filters
+        outfilters: number of output filters
+        filter_size: filter size
         norm_type: Normalization type; either 'batchnorm' or 'instancenorm'.
         apply_dropout: If True, adds the dropout layer
 
@@ -94,31 +102,34 @@ def upsample(id, filters, size, is3d, norm_type='batchnorm', apply_dropout=False
 
     initializer = tf.random_normal_initializer(0., 0.02)
 
-    result = tf.keras.Sequential(name=f"Upsample_{id}")
-
     if is3d:
-        result.add(
-          tf.keras.layers.Conv3DTranspose(filters, size, strides=2,
-                                          padding='same',
-                                          kernel_initializer=initializer,
-                                          use_bias=False, name="conv2up"))
+        convlayer = tf.keras.layers.Conv3D
+        convlayerup = tf.keras.layers.Conv3DTranspose
+        inp = tf.keras.layers.Input(shape=[None, None, None, infilters], name='input_image')
     else:
-        result.add(
-          tf.keras.layers.Conv2DTranspose(filters, size, strides=2,
-                                          padding='same',
-                                          kernel_initializer=initializer,
-                                          use_bias=False, name="conv2up"))
+        convlayer = tf.keras.layers.Conv2D
+        convlayerup = tf.keras.layers.Conv2DTranspose
+        inp = tf.keras.layers.Input(shape=[None, None, infilters], name='input_image')
 
     if norm_type.lower() == 'batchnorm':
-        result.add(tf.keras.layers.BatchNormalization())
+        normlayer = tf.keras.layers.BatchNormalization
     elif norm_type.lower() == 'instancenorm':
-        result.add(InstanceNormalization(is3d))
+        normlayer = lambda x: InstanceNormalization(is3d)(x)
 
+    # perform convolution
+    conv = convlayer(outfilters*2, 3, strides=1, padding="valid",
+            kernel_initializer=initializer, use_bias=False)(inp)
+    res = normlayer(conv)
+    before_up = tf.keras.layers.LeakyReLU()(res)
+    
+    # perform upsample 
+    conv = convlayerup(outfilters, filter_size, strides=2, padding='same',
+            kernel_initializer=initializer, use_bias=False, name="convup2")(before_up)
+    res = normlayer(conv)
     if apply_dropout:
-        result.add(tf.keras.layers.Dropout(0.5))
-
-    result.add(tf.keras.layers.ReLU())
-
-    return result
+        res = tf.keras.layers.Dropout(0.5)(res)
+    last = tf.keras.layers.LeakyReLU()(res)
+    
+    return tf.keras.Model(inputs=inp, outputs=last, name=f"Upsample_{id}")
 
 
