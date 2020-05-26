@@ -107,7 +107,7 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     curr_dim = (curr_dim - 2) * 2 
     up0_cat = concat(up0, skip0, skip0_dim, curr_dim)
 
-    # add a 1x1 convolution ad the end instad? 
+    # add a 1x1 convolution at the end instad? 
     if is3d:
         x = tf.keras.layers.Conv3D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
     else:

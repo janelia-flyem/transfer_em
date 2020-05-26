@@ -192,6 +192,7 @@ class EM2EM(object):
         self.discriminator_y_optimizer.apply_gradients(zip(discriminator_y_gradients,
                                                 self.discriminator_y.trainable_variables))
 
+        return total_gen_g_loss
 
     def plot_discriminator(self, location):
         """Plot discriminator.
@@ -221,11 +222,16 @@ class EM2EM(object):
                 # progress bar
                 with tqdm.tqdm(total=num_samples) as pbar:
                     for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
-                        self.train_step(data_f, data_g)
+                        loss = self.train_step(data_f, data_g)
                         pbar.update(1)
             else:
+                loss = tf.constant(0.0)
+                count = 0
                 for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
-                    self.train_step(data_f, data_g)
+                    loss += self.train_step(data_f, data_g)
+                    count += 1
+                loss = loss / count
+                print(f"Epoch {epoch+1} loss: {loss.numpy()}")
 
             if (epoch + 1) % 1 == 0:
                 self.make_checkpoint(epoch+1)
