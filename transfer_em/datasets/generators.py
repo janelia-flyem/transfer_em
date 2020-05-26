@@ -62,7 +62,7 @@ def fetch_raw_dvid(server, uuid, instance, box_zyx, session):
     return a.reshape(shape_zyx)
 
 
-def volume3d_dvid(dvid_server, uuid, instance, bbox, size=64, seed=None):
+def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None):
     """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from DVID.
 
@@ -95,19 +95,62 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=64, seed=None):
     return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
 
 
-def volume3d_ng(location, size=32):
-    """Returns a generator that will prodduce an infinite number of 3D volumes
-    that are stored in neuroglancer format.
+def volume3d_ng(location, bbox, size=132, seed=None):
+    """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
+    from neuroglancer precomputed.
 
-    TODO
+    Note: only support uint8blk.
     """
-    
+
     try:
         import tensorstore as ts
     except ImportError:
         raise Exception("tensorstore not installed")
 
-    # TODO 
-    raise Exception("ng volume retrieval not implemented yet")
+    def generator():
+        
+        # make repeatable if a seed is set
+        if seed is not None:
+            tf.random.set_seed(seed)
+
+        while True:
+            #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
+            xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
+            ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
+            zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
+            yield (xstart, ystart, zstart)
+            #yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
+   
+    location_arr = location.split('/')
+    bucket = location_arr[0]
+    path = '/'.join(location_arr[1:])
+
+    # reuse tensorstore object
+    dataset = ts.open({
+        'driver': 'neuroglancer_precomputed',
+        'kvstore': {
+            'driver': 'gcs',
+            'bucket': bucket,
+            },
+        'path': path,
+        'recheck_cached_data': 'open',
+        'scale_index': 0 
+    }).result()
+    dataset = dataset[ts.d['channel'][0]]
+
+    def mapper(xstart, ystart, zstart):
+        # read from tensorstore
+        data = dataset[xstart:(xstart+size), ystart:(ystart+size), zstart:(zstart+size)].read().result()
+        return tf.convert_to_tensor(data, dtype=tf.uint8)
+
+    def wrapper_mapper(x, y, z):
+        tensor = tf.py_function(func = mapper, inp=(x,y,z), Tout = tf.uint8)
+        tensor.set_shape((size, size, size))
+        return tensor
+
+    return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
+
+
+
 
 
