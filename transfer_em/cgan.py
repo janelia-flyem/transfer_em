@@ -43,6 +43,7 @@ class EM2EM(object):
         # dimsize2 should always be even
         assert((dimsize2 % 2) == 0)
         self.buffer = (dimsize - dimsize2) // 2
+        self.outdimsize = dimsize2
 
         # create optimizers
         self.generator_g_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
@@ -65,7 +66,9 @@ class EM2EM(object):
                                    generator_g_optimizer=self.generator_g_optimizer,
                                    generator_f_optimizer=self.generator_f_optimizer,
                                    discriminator_x_optimizer=self.discriminator_x_optimizer,
-                                   discriminator_y_optimizer=self.discriminator_y_optimizer)
+                                   discriminator_y_optimizer=self.discriminator_y_optimizer,
+                                   buffer = self.buffer,
+                                   outdimsize = self.outdimsize)
 
         self.ckpt_manager = tf.train.CheckpointManager(self.ckpt, checkpoint_path, max_to_keep=5)
 

@@ -62,7 +62,7 @@ def fetch_raw_dvid(server, uuid, instance, box_zyx, session):
     return a.reshape(shape_zyx)
 
 
-def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None):
+def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None, array=None):
     """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from DVID.
 
@@ -70,18 +70,22 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None):
     """
 
     def generator():
-        
-        # make repeatable if a seed is set
-        if seed is not None:
-            tf.random.set_seed(seed)
+        # use manaul provided bboxes
+        if array is not None:
+            for start in array:
+                yield start
+        else:
+            # make repeatable if a seed is set
+            if seed is not None:
+                tf.random.set_seed(seed)
 
-        while True:
-            #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
-            xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
-            ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
-            zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
-            yield (xstart, ystart, zstart)
-            #yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
+            while True:
+                #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
+                xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
+                ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
+                zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
+                yield (xstart, ystart, zstart)
+                #yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
     
     def mapper(xstart, ystart, zstart):
         session = requests.Session()
@@ -95,7 +99,7 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None):
     return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
 
 
-def volume3d_ng(location, bbox, size=132, seed=None):
+def volume3d_ng(location, bbox, size=132, seed=None, array=None):
     """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from neuroglancer precomputed.
 
@@ -108,19 +112,22 @@ def volume3d_ng(location, bbox, size=132, seed=None):
         raise Exception("tensorstore not installed")
 
     def generator():
-        
-        # make repeatable if a seed is set
-        if seed is not None:
-            tf.random.set_seed(seed)
+        if array is not None:
+            for start in array:
+                yield start
+        else:
+            # make repeatable if a seed is set
+            if seed is not None:
+                tf.random.set_seed(seed)
 
-        while True:
-            #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
-            xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
-            ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
-            zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
-            yield (xstart, ystart, zstart)
-            #yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
-   
+            while True:
+                #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
+                xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
+                ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
+                zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
+                yield (xstart, ystart, zstart)
+                #yield tf.convert_to_tensor(fetch_raw_dvid(dvid_server, uuid, instance, [[xstart,ystart,zstart], [xstart+size, ystart+size, zstart+size]], session), dtype=tf.uint8)
+       
     location_arr = location.split('/')
     bucket = location_arr[0]
     path = '/'.join(location_arr[1:])
