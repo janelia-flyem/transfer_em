@@ -99,17 +99,18 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None, array=
     return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
 
 
-def volume3d_ng(location, bbox, size=132, seed=None, array=None):
+def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
     """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from neuroglancer precomputed.
 
     Note: only support uint8blk.
     """
 
-    try:
-        import tensorstore as ts
-    except ImportError:
-        raise Exception("tensorstore not installed")
+    if cloudrun is None:
+        try:
+            import tensorstore as ts
+        except ImportError:
+            raise Exception("tensorstore not installed")
 
     def generator():
         if array is not None:
@@ -132,23 +133,46 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None):
     bucket = location_arr[0]
     path = '/'.join(location_arr[1:])
 
-    # reuse tensorstore object
-    dataset = ts.open({
-        'driver': 'neuroglancer_precomputed',
-        'kvstore': {
-            'driver': 'gcs',
-            'bucket': bucket,
-            },
-        'path': path,
-        'recheck_cached_data': 'open',
-        'scale_index': 0 
-    }).result()
-    dataset = dataset[ts.d['channel'][0]]
+    if cloudrun is None:
+        # reuse tensorstore object
+        dataset = ts.open({
+            'driver': 'neuroglancer_precomputed',
+            'kvstore': {
+                'driver': 'gcs',
+                'bucket': bucket,
+                },
+            'path': path,
+            'recheck_cached_data': 'open',
+            'scale_index': 0 
+        }).result()
+        dataset = dataset[ts.d['channel'][0]]
+    else:
+        import requests
+        token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
+        headers = {}
+        headers["Authorization"] = f"Bearer {token[:-1]}"
 
     def mapper(xstart, ystart, zstart):
-        # read from tensorstore
-        data = dataset[xstart:(xstart+size), ystart:(ystart+size), zstart:(zstart+size)].read().result()
-        return tf.convert_to_tensor(data, dtype=tf.uint8)
+        if cloudrun is None:
+            # read from tensorstore
+            data = dataset[xstart:(xstart+size), ystart:(ystart+size), zstart:(zstart+size)].read().result()
+            return tf.convert_to_tensor(data, dtype=tf.uint8)
+        else:
+            # read from cloud run function
+            config = {"location": location, "size": [size, size, size], "start": [xstart, ystart, zstart]} 
+            res = requests.post(cloudrun, data=json.dumps(config), headers=headers) 
+            if res.status_code != 200:
+                # refetch token if obsolete
+                token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
+                headers["Authorization"] = f"Bearer {token[:-1]}"
+                res = requests.post(cloudrun, data=json.dumps(config), headers=headers) 
+            if res.status != 200:
+                raise RuntimeError("cloud run failed")
+            data = np.frombytes(res.content)
+            data = data.reshape((size,size,size))
+            data = data.transpose((2,1,0))
+            return tf.convert_to_tensor(data, dtype=tf.uint8)
+            
 
     def wrapper_mapper(x, y, z):
         tensor = tf.py_function(func = mapper, inp=(x,y,z), Tout = tf.uint8)

@@ -1,0 +1,5 @@
+{
+	"location": "neuroglancer-janelia-flyem-hemibrain/emdata/raw/jpeg",
+	"start": [10000, 10000, 10000],
+	"size": [1, 1, 1]
+}

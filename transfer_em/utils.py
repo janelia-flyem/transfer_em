@@ -6,7 +6,7 @@ from .datasets.datasets import create_dataset_from_generator, unstandardize_popu
 import numpy as np
 
 
-def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y):
+def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun=None):
     # chunk in cubes with overlap
     rois = []
     index = []
@@ -17,7 +17,7 @@ def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y):
                 index.append((xiter - start[0], yiter - start[1], ziter - start[2]))
 
     # create dataset
-    dataset = volume3d_ng(location, None, size=(model.outdimsizesize + model.buffer*2), array=rois)  
+    dataset = volume3d_ng(location, None, size=(model.outdimsizesize + model.buffer*2), array=rois, cloudrun=cloudrun)  
     dataset = create_dataset_from_generator(dataset, None, batch_size=1, epoch_size=len(rois), global_adjust=False, meanstd=meanstd_x)
 
     # run inference over all the small subvolumes
