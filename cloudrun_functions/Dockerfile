@@ -8,8 +8,8 @@ RUN apt-get install -y python3-dev \
 RUN python3 -m pip install numpy
 RUN python3 -m pip install flask
 RUN python3 -m pip install flask-cors
-RUN python3 -m pip install tensorstore -vv
 RUN python3 -m pip install gunicorn
+RUN python3 -m pip install tensorstore -vv
 
 WORKDIR /opt/app
 COPY transferem.py ./ 
