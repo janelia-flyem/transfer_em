@@ -3,6 +3,8 @@
 
 import requests
 import numpy as np
+import subprocess
+import json
 import tensorflow as tf
 from tensorflow.data.experimental import AUTOTUNE
 
@@ -151,35 +153,40 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
         token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
         headers = {}
         headers["Authorization"] = f"Bearer {token[:-1]}"
+        headers["Content-type"] = "application/json"
 
+    #@tf.function
     def mapper(xstart, ystart, zstart):
+        #xstart = xstart.numpy()
+        #ystart = ystart.numpy()
+        #zstart = zstart.numpy()
         if cloudrun is None:
             # read from tensorstore
             data = dataset[xstart:(xstart+size), ystart:(ystart+size), zstart:(zstart+size)].read().result()
             return tf.convert_to_tensor(data, dtype=tf.uint8)
         else:
             # read from cloud run function
-            config = {"location": location, "size": [size, size, size], "start": [xstart, ystart, zstart]} 
-            res = requests.post(cloudrun, data=json.dumps(config), headers=headers) 
+            config = {"location": location, "size": [int(size), int(size), int(size)], "start": [int(xstart), int(ystart), int(zstart)]} 
+            res = requests.post(cloudrun+"/volume", data=json.dumps(config), headers=headers)
             if res.status_code != 200:
                 # refetch token if obsolete
                 token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
                 headers["Authorization"] = f"Bearer {token[:-1]}"
-                res = requests.post(cloudrun, data=json.dumps(config), headers=headers) 
-            if res.status != 200:
+                res = requests.post(cloudrun+"/volume", data=json.dumps(config), headers=headers) 
+            if res.status_code != 200:
                 raise RuntimeError("cloud run failed")
-            data = np.frombytes(res.content)
+            data = np.fromstring(res.content, dtype=np.uint8)
             data = data.reshape((size,size,size))
             data = data.transpose((2,1,0))
             return tf.convert_to_tensor(data, dtype=tf.uint8)
             
-
+    #@tf.function
     def wrapper_mapper(x, y, z):
         tensor = tf.py_function(func = mapper, inp=(x,y,z), Tout = tf.uint8)
         tensor.set_shape((size, size, size))
         return tensor
 
-    return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
+    return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches number of parallel http calls possible
 
 
 

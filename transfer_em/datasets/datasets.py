@@ -165,6 +165,6 @@ def create_dataset_from_generator(generator, shape, custom_map=None, batch_size=
         dataset = dataset.map(lambda x: standardize_population(x, meanstd), num_parallel_calls=AUTOTUNE)
 
     # shuffle dataset, batch, prefetch
-    return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd
+    return dataset.batch(batch_size, drop_remainder=True), meanstd #.prefetch(AUTOTUNE), meanstd
 
 

@@ -66,9 +66,7 @@ class EM2EM(object):
                                    generator_g_optimizer=self.generator_g_optimizer,
                                    generator_f_optimizer=self.generator_f_optimizer,
                                    discriminator_x_optimizer=self.discriminator_x_optimizer,
-                                   discriminator_y_optimizer=self.discriminator_y_optimizer,
-                                   buffer = self.buffer,
-                                   outdimsize = self.outdimsize)
+                                   discriminator_y_optimizer=self.discriminator_y_optimizer)
 
         self.ckpt_manager = tf.train.CheckpointManager(self.ckpt, checkpoint_path, max_to_keep=5)
 
