@@ -19,13 +19,14 @@ VALID_DIMS = [132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 2
 
 VALID_OUT = [76, 84, 92, 100, 108, 116, 124, 132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452]
 
-def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
+def unet_generator(dimsize, is3d=True, norm_type='instancenorm', wf = 8):
     """Modified u-net generator model based on https://arxiv.org/abs/1611.07004.
 
       Args:
         dimsize: length of each dimentions (must be square or cube)
         is3d: true=3d tensor; false=2d tensor
         norm_type: Type of normalization. Either 'batchnorm' or 'instancenorm'.
+        wf: width factor.  depending on model size, might need to divide the width by a certain factor
 
       Returns:
         Generator model
@@ -48,21 +49,21 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     curr_dim = dimsize
 
     # downsample 4 time
-    down, skip = downsample("1", 1, 64, is3d, apply_norm=False)
+    down, skip = downsample("1", 1, 64//wf, is3d, apply_norm=False)
     skip0 = skip(inputs)
     down1 = down(inputs)
     curr_dim = curr_dim - 2
     skip0_dim = curr_dim
     curr_dim = (curr_dim // 2) - 1
 
-    down, skip = downsample("2", 64, 128, is3d, norm_type=norm_type)
+    down, skip = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type)
     skip1 = skip(down1)
     down2 = down(down1)
     curr_dim = curr_dim - 2
     skip1_dim = curr_dim
     curr_dim = (curr_dim // 2) - 1
    
-    down, skip = downsample("3", 128, 256, is3d, norm_type=norm_type)
+    down, skip = downsample("3", 128//wf, 256//wf, is3d, norm_type=norm_type)
     skip2 = skip(down2)
     down3 = down(down2)
     curr_dim = curr_dim - 2
@@ -94,16 +95,16 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm'):
     #curr_dim = (curr_dim - 2) * 2 
     #up3_cat = concat(up3, skip3, skip3_dim, curr_dim)
 
-    up2 = upsample("3", 256, 256, is3d, norm_type=norm_type, apply_dropout=True)(down3)
+    up2 = upsample("3", 256//wf, 256//wf, is3d, norm_type=norm_type, apply_dropout=True)(down3)
     #up2 = upsample("3", 1024, 256, is3d, norm_type=norm_type, apply_dropout=True)(up3_cat)
     curr_dim = (curr_dim - 2) * 2 
     up2_cat = concat(up2, skip2, skip2_dim, curr_dim)
     
-    up1 = upsample("2", 512, 128, is3d, norm_type=norm_type, apply_dropout=True)(up2_cat)
+    up1 = upsample("2", 512//wf, 128//wf, is3d, norm_type=norm_type, apply_dropout=True)(up2_cat)
     curr_dim = (curr_dim - 2) * 2 
     up1_cat = concat(up1, skip1, skip1_dim, curr_dim)
     
-    up0 = upsample("1", 256, 64, is3d, norm_type=norm_type, apply_dropout=True)(up1_cat)
+    up0 = upsample("1", 256//wf, 64//wf, is3d, norm_type=norm_type, apply_dropout=True)(up1_cat)
     curr_dim = (curr_dim - 2) * 2 
     up0_cat = concat(up0, skip0, skip0_dim, curr_dim)
 

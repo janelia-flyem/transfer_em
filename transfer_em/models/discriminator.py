@@ -12,7 +12,7 @@ import tensorflow as tf
 from .utils import *
 
 
-def discriminator(is3d=True, norm_type='instancenorm'):
+def discriminator(is3d=True, norm_type='instancenorm', wf=8):
     """PatchGan discriminator model similar to https://arxiv.org/abs/1611.07004.
 
     2d images should probably be less than 256x256.  3D volumes should be <=40x40
@@ -20,6 +20,7 @@ def discriminator(is3d=True, norm_type='instancenorm'):
     Args:
         is3d: true=3d tensor; false=2d tensor
         norm_type: Type of normalization. Either 'batchnorm' or 'instancenorm'.
+        wf: width factor.  depending on model size, might need to divide the width by a certain factor
 
     Returns:
         Discriminator model
@@ -34,21 +35,21 @@ def discriminator(is3d=True, norm_type='instancenorm'):
     x = inp
 
     # 3 downsamples (conv + strided conv downsample)
-    down, _ = downsample("1", 1, 64, is3d, norm_type=norm_type, apply_norm=False)
+    down, _ = downsample("1", 1, 64//wf, is3d, norm_type=norm_type, apply_norm=False)
     down1 = down(x)
-    down, _ = downsample("2", 64, 128, is3d, norm_type=norm_type)
+    down, _ = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type)
     down2 = down(down1)
-    down, _ = downsample("3", 128, 256, is3d, norm_type=norm_type)
+    down, _ = downsample("3", 128//wf, 256//wf, is3d, norm_type=norm_type)
     down3 = down(down2)
 
     # valid convolution
     if is3d:
         conv = tf.keras.layers.Conv3D(
-          512, 3, strides=1, kernel_initializer=initializer,
+          512//wf, 3, strides=1, kernel_initializer=initializer,
           use_bias=False)(down3)  # (bs, 28, 28, 512)
     else:
         conv = tf.keras.layers.Conv2D(
-          512, 3, strides=1, kernel_initializer=initializer,
+          512//wf, 3, strides=1, kernel_initializer=initializer,
           use_bias=False)(down3)  # (bs, 28, 28, 512)
 
     if norm_type.lower() == 'batchnorm':
