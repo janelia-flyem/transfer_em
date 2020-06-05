@@ -6,7 +6,7 @@ import numpy as np
 import subprocess
 import json
 import tensorflow as tf
-from tensorflow.data.experimental import AUTOTUNE
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 def fetch_raw_dvid(server, uuid, instance, box_zyx, session):
     """

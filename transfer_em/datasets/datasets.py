@@ -5,7 +5,7 @@ Note: assume 1 channel data only but allow for 2d or 3d input
 """
 
 import tensorflow as tf
-from tensorflow.data.experimental import AUTOTUNE
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 BATCH_SIZE = 64
 EPOCH_SIZE = 4096 # provides a bound for generators
