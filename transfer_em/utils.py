@@ -3,7 +3,10 @@
 
 from .datasets.generators import volume3d_ng 
 from .datasets.datasets import create_dataset_from_generator, unstandardize_population
+from .cgan import EM2EM
+import tensorflow as tf
 import numpy as np
+import json
 
 
 def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun=None, fetch_input=False):
@@ -60,3 +63,42 @@ def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun
     if fetch_input:
         return in_buffer[0:size[0], 0:size[1], 0:size[2]], out_buffer[0:size[0], 0:size[1], 0:size[2]]
     return out_buffer[0:size[0], 0:size[1], 0:size[2]]
+
+
+def save_model(name, ckpt_dir, meanstd_x, meanstd_y, size=132, is3d=True):
+    """Save generator model for inference in google AI platform.
+
+    Note: metadata for size and buffer is stored as a JSON.
+
+    Args:
+        name (str): Name for model
+        ckpt_dir (str): Location of checkpoint including epoch number
+        meanstd_x ((float, float): mean and stddev for x
+        meanstd_y ((float, float): mean and stddev for y
+        size (int): dimension size
+        is3d (boolean): 3d or 2d model
+    """
+    model = EM2EM(size, name, is3d=is3d, ckpt_restore=ckpt_dir)
+
+    tf.keras.models.save_model(
+        model.generator_g,
+        name,
+        overwrite=True,
+        include_optimizer=False,
+        save_format=None,
+        signatures=None,
+        options=None
+    )
+
+    meta = {
+        "buffer": model.buffer,
+        "outdimsize": model.outdimsize,
+        "meanstd_x": [float(meanstd_x[0]), float(meanstd_x[1])],
+        "meanstd_y": [float(meanstd_y[0]), float(meanstd_y[1])]
+    }
+
+    fout = open(name+"/meta.json", 'w')
+    fout.write(json.dumps(meta))
+    fout.close()
+
+
