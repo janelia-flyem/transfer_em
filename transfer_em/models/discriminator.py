@@ -52,12 +52,15 @@ def discriminator(is3d=True, norm_type='instancenorm', wf=8):
           512//wf, 3, strides=1, kernel_initializer=initializer,
           use_bias=False)(down3)  # (bs, 28, 28, 512)
 
+    """
     if norm_type.lower() == 'batchnorm':
         norm1 = tf.keras.layers.BatchNormalization()(conv)
     elif norm_type.lower() == 'instancenorm':
         norm1 = InstanceNormalization()(conv)
 
     leaky_relu = tf.keras.layers.LeakyReLU()(norm1)
+    """
+    leaky_relu = tf.keras.layers.LeakyReLU()(conv)
 
     if is3d:
         last = tf.keras.layers.Conv3D(

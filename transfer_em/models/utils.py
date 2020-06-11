@@ -72,13 +72,15 @@ def downsample(id, infilters, outfilters, is3d, filter_size=4, norm_type='instan
     # perform convolution
     conv = convlayer(outfilters, 3, strides=1, padding="valid",
             kernel_initializer=initializer, use_bias=False)(inp)
-    norm1 = normlayer(conv)
-    before_down = tf.keras.layers.LeakyReLU()(norm1)
+    #norm1 = normlayer(conv)
+    #before_down = tf.keras.layers.LeakyReLU()(norm1)
+    before_down = tf.keras.layers.LeakyReLU()(conv)
     
     # perform downsample 
     conv = convlayer(outfilters, filter_size, strides=2, kernel_initializer=initializer, use_bias=False)(before_down)
-    norm1 = normlayer(conv)
-    last = tf.keras.layers.LeakyReLU()(norm1)
+    #norm1 = normlayer(conv)
+    #last = tf.keras.layers.LeakyReLU()(norm1)
+    last = tf.keras.layers.LeakyReLU()(conv)
     
     return tf.keras.Model(inputs=inp, outputs=last, name=f"Downsample_{id}"), tf.keras.Model(inputs=inp, outputs=before_down)
 
@@ -119,15 +121,17 @@ def upsample(id, infilters, outfilters, is3d, filter_size=4, norm_type='instance
     # perform convolution
     conv = convlayer(outfilters*2, 3, strides=1, padding="valid",
             kernel_initializer=initializer, use_bias=False)(inp)
-    res = normlayer(conv)
-    before_up = tf.keras.layers.LeakyReLU()(res)
+    #res = normlayer(conv)
+    #before_up = tf.keras.layers.LeakyReLU()(res)
+    before_up = tf.keras.layers.LeakyReLU()(conv)
     
     # perform upsample 
     conv = convlayerup(outfilters, filter_size, strides=2, padding='same',
             kernel_initializer=initializer, use_bias=False, name="convup2")(before_up)
-    res = normlayer(conv)
+    #res = normlayer(conv)
     if apply_dropout:
-        res = tf.keras.layers.Dropout(0.5)(res)
+        #res = tf.keras.layers.Dropout(0.5)(res)
+        res = tf.keras.layers.Dropout(0.5)(conv)
     last = tf.keras.layers.LeakyReLU()(res)
     
     return tf.keras.Model(inputs=inp, outputs=last, name=f"Upsample_{id}")
