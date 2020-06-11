@@ -7,6 +7,20 @@ from .cgan import EM2EM
 import tensorflow as tf
 import numpy as np
 import json
+import os
+
+def predict_cube_from_saved_model(location, start, size, cloudrun, model_dir, fetch_input=False):
+
+    meta_path = os.path.join(model_dir, 'meta.json')
+    model = tf.keras.models.load_model(model_dir, compile=False)
+    meta = json.load(open(meta_path))
+
+    outdimsize = meta["outdimsize"] 
+    buffer = meta["buffer"]
+    meanstd_x = meta["meanstd_x"]
+    meanstd_y = meta["meanstd_y"]
+    
+    return predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun, outdimsize=outdimsize, buffer=buffer, fetch_input=fetch_input)
 
 
 def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun=None, fetch_input=False, outdimsize=None, buffer=None):
