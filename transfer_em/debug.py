@@ -3,7 +3,6 @@ The user should have a source for the target domain.  This module provides a fun
 to create an artificial initial domain and a function to assess accuracy. 
 """
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
 def warp_tensor(tensor):
     """Apply warping to tensor after scaling between -1 and 1.
@@ -80,6 +79,7 @@ def generate_images(orig, pred):
     Args:
         orig (tf.tensor): [b, z-opt, y, x, nch]
     """
+    import matplotlib.pyplot as plt
     
     if orig.shape.rank == 5:
         orig = orig[0,0,:,:,0]

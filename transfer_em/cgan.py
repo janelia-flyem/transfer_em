@@ -15,7 +15,6 @@ import time
 from .models.discriminator import *
 from .models.generator import *
 from .debug import generate_images, accuracy
-import tqdm
 
 class EM2EM(object):
     """Creates CGAN model for 1-channenl 2d or 3d data and provides functions to train and predict.
@@ -221,6 +220,7 @@ class EM2EM(object):
    
             if debug:
                 # progress bar
+                import tqdm
                 with tqdm.tqdm(total=num_samples) as pbar:
                     for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
                         loss = self.train_step(data_f, data_g)
