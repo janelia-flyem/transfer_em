@@ -11,6 +11,7 @@ setup(name='transfer_em',
       long_description=long_description,
       author_email='plazas@janelia.hhmi.org',
       url='https://github.com/janelia-flyem/transfer_em',
+      scripts=["transfer_em/predict_service.py"],
       packages=find_packages(),
       )
 

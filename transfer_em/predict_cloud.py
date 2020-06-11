@@ -3,7 +3,7 @@ import googleapiclient.discovery
 import numpy as np
 import base64
 
-def predict_cloud(project, model, location, start, size, version=None):
+def predict_cloud(project, model, location, cloudrun, start, size, version=None):
     """Send json data to a deployed model for prediction.
 
     Args:
@@ -28,6 +28,7 @@ def predict_cloud(project, model, location, start, size, version=None):
     # create request dictionary
     payload = [{
         "location": location,
+        "cloudrun": cloudrun,
         "start": start,
         "size": size
     }]
