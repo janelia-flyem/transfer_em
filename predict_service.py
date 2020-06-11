@@ -8,7 +8,7 @@ import json
 
 import numpy as np
 import tensorflow as tf
-from .utils import predict_ng_cube
+from transfer_em.utils import predict_ng_cube
 import base64
 
 class TransferEMPredictor(object):
@@ -38,6 +38,7 @@ class TransferEMPredictor(object):
         Returns:
             A list of outputs containing the prediction results.
         """
+
         if len(instances) != 1:
             raise RuntimeError("only one instance allowed")
     
@@ -64,6 +65,8 @@ class TransferEMPredictor(object):
         Returns:
             An instance of `MyPredictor`.
         """
+        #tf.enable_eager_execution()
+
         meta_path = os.path.join(model_dir, 'meta.json')
         model = tf.keras.models.load_model(model_dir, compile=False)
         meta = json.load(open(meta_path))

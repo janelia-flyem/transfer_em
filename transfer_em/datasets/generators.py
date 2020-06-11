@@ -150,7 +150,7 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
         dataset = dataset[ts.d['channel'][0]]
     else:
         import requests
-        token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
+        token = subprocess.check_output(["gcloud auth print-access-token"], shell=True).decode()
         headers = {}
         headers["Authorization"] = f"Bearer {token[:-1]}"
         headers["Content-type"] = "application/json"
@@ -170,7 +170,7 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
             res = requests.post(cloudrun+"/volume", data=json.dumps(config), headers=headers)
             if res.status_code != 200:
                 # refetch token if obsolete
-                token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
+                token = subprocess.check_output(["gcloud auth print-access-token"], shell=True).decode()
                 headers["Authorization"] = f"Bearer {token[:-1]}"
                 res = requests.post(cloudrun+"/volume", data=json.dumps(config), headers=headers) 
             if res.status_code != 200:
