@@ -1,7 +1,7 @@
 # transfer\_em
 
-This package implements a CycleGANs designed to style transfer one 3D electron microscopy
-dataset (EM) to another.  One potential use case would be to transfer data X to Y where
+This package implements a CycleGAN designed to style transfer one 3D electron microscopy (EM)
+dataset to another.  One potential use case would be to transfer data X to Y where
 pretrained classifiers already exist for Y.  Another application could be to 'prettify'
 data.
 
@@ -10,86 +10,87 @@ only with 1 channel, 8 bit data (either 2D or 3D isotropic/near-isotropic).
 
 Features:
 
-* Ability to specify datasets with 2D or 3D numpy arrays or using supported
-datasources
-* Augmentation and warping dataset mapping options (mostly useful for debugging)
-* Options for specifying 2D or 3D network and different model sizes
+* Ability to create tensorflow datasets from 2D or 3D numpy arrays or by fetching dynamically from supported
+datasources (DVID and google pre-computed)
+* Dataset augmentation and warping mapping routines (mostly useful for debugging)
+* Programmable options for specifying 2D or 3D networks and different model sizes
 * Example python notebooks for training and running inference
 * Helper functions for running inference on large subvolumes
-* (hopefully soon) Support for serving model on Google AI Platform (see below)
+* (hopefully soon) Support for serving a model on Google AI Platform (see below)
 
 Network design:
 
-* Generator: u-net with 3 strided downsample layers, and 3x3 convolutions in between
-* Discrimiantor: 3 strided downsample with 3x3 convolution layers in between
+* Generator: u-net with 3 strided downsample layers with 3x3 convolutions in between, followed by up-sample counterparts
+* Discrimiantor: 3 strided downsample layers with 3x3 convolution layers in between
 * Discriminator, identity, and cycle loss terms
 * Fully convolutional, all VALID convolutions
 
 ## Installation and use
 
 To run inference from a pre-trained model (see notebook example at examples/run_local_predict.ipynb),
-one just needs to have tensorflow 2.2 installed and then build this package:
+one just needs to have tensorflow 2.2 installed and matplotlib and then build this package:
 
-% python setup.py install
+    % python setup.py install
 
 To perform training and use some of the other features in this package:
 
-% pip install tqdm pillow
+    % pip install tqdm pillow
 
-Install pydot/pydotplus/graphviz to use tensorflow's model output.
+Install pydot/pydotplus/graphviz to use tensorflow's model architecture plotting.
 
-One can learn the training and inference routines with an included 2D example using
-examples/simple_training.ipynb.  There is an example of fetching data dynamically
-from [neuroglancer precomputed](https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed) formatted data stored in the cloud here: example/generator_training3D.ipynb.
-To do this, one needs to create a service to access this data (see cloudrun_functions/README.md).
+One can learn the training and inference routines with the included 2D example using
+examples/simple_training.ipynb.  There is an example notebook (examples/generator_training3D.ipynb)
+for training 3D data
+fetched dynamically from the cloud.
+To run this example and access the cloud data, one needs to create a cloud run http service (see cloudrun_functions/README.md).
+The data is stored [neuroglancer precomputed](https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed) format.
+(Note: in principle, the fetching of precomputed data does not
+require a separate HTTP service, but making a separate web service greatly simplified the software
+depenedencies for transfer_em.  This situation might change in the future.)
 Alternatively, one can pre-download the data from the cloud and create a dataset as is
-done for the 2D example.  (Note: in principle, the fetching of precomputed data does not
-require a separate service but making a separate web service greatly simplified the software
-depenedencies for this package.  This situation might change in future versions.)
-
+done for the 2D example.
 
 ## Google AI Platform
 
-Google Cloud provides a nice set of managed tools for training and using deep networks.
+Google Cloud provides a set of managed tools for training and using deep networks.
 
-One can run the example notebooks in this package using the managed [AI Platform Notebooks](https://cloud.google.com/ai-platform-notebooks).  Conveniently, Google provides images with pre-installed deep learning libraries (documented
-[here](https://cloud.google.com/ai-platform/deep-learning-vm/docs)).  The above makes
-launching notebooks or running headless training scripts straightforward (the installation notes
-above still need to be followed, though tensorflow is already installed and configured).  Note:
-if one is using running scripts offline, the notebook application should be shutdown
-as it will use the GPU resources.
+Conveniently, Google provides VM images with pre-installed deep learning libraries (documented
+[here](https://cloud.google.com/ai-platform/deep-learning-vm/docs)).  One can run the example notebooks in this package using the managed [AI Platform Notebooks](https://cloud.google.com/ai-platform-notebooks).    The managed platform above makes
+launching notebooks or running headless training scripts straightforward (transfer_em still needs to be installed on this
+VM as documented above but tensorflow is already installed and configured).  Note:
+the notebook application should be shutdown to release the GPU if one is running scripts via the command-line on the VM. 
 
 ### Hosting a model in the cloud
 
-
 One of the nice features of Google AI Platform is the ability to save a model
-to the cloud and run inference using an auto-scaled serverless endpoint ([here](https://cloud.google.com/ai-platform/prediction/docs/deploying-models#console)).  There is a simple API to invoke via python 
-and HTTP.  Unfortunately, some customized routines before invoking the model and this would ideally
-be run on this remote platform.  As of this time, Tensorflow >2 is not supported
+to the cloud and run inference using an auto-scaled serverless endpoint ([here](https://cloud.google.com/ai-platform/prediction/docs/deploying-models#console)).  This enables inference to be run via
+a simple HTTP or Python API.  transfer_em requires some customized pre and post-processing steps
+that should ideally be run on the remote platform.  Unfortunately, as of this time, Tensorflow >2 is not supported
 with customized prediction routines.
 
-This package does have untested code to implement such a prediction routine when support
-is provided.  To load a model, the following steps should be done:
+When support for Tensorflow >2 is provided, one can perform the following steps
+to host the model and perform inference (this workflow is untested):
 
-* save the model based on a training checkpoint using bin/saved_model.py
+* save the model based on a training checkpoint using the script bin/saved_model.py
 * copy the saved model directory to a Google storage bucket
-* upload a python build of transfer_em to a Google storage bucket (it can be the same bucket as the saved model)
-% python setup.py sdist --formats=gztar 
-* load the model into the AI platform [here](load model: https://console.cloud.google.com/ai-platform/models)
-* create a version of that model (follow the UI prompts (options: python 3.7, Custom Prediciton Routines,
-select directory of the saved model, select package tar file, set the class predict_service.TransferEMPredictor)
+* upload a python build of transfer_em (see command below) to a Google storage bucket (it can be the same bucket as the saved model)
+
+    % python setup.py sdist --formats=gztar 
+
+* load the model into the AI platform [here](https://console.cloud.google.com/ai-platform/models)
+* create a version of that model following the UI prompts (options: python 3.7, Custom Prediction Routines,
+select the directory of the saved model, select the transfer_em package tar file, set the prediction class to predict_service.TransferEMPredictor)
 
 transfer_em provides a 'predict_service' that implements a custom python routine for inference
 on the AI platform.  To use this service, see the examples/run_cloud_predict_service.ipynb.  (Note:
-currently this service is setup to use CloudRun to access precomputed image volumes.)
-
+currently this service is setup to use CloudRun to access the precomputed image volumes.)
 
 ## TODO
 
-* Allow users to provide a pre-trained classifier (for a target application) to be
-used to constrain the discriminator
-* Provide option for simplifying the network to enable a smaller model
+* Allow users to provide a pre-trained classifier (for a desired target application) to be
+used to constrain the transfer_em discriminator
+* Provide an option for simplifying the network for faster training or debugging
 * Implement mirrored training for multiple GPUs (this requires some of the loss
 calculations to be modified slightly)
-* Test and deploy cloud-based model hosting and inference.
-* Use pre-built tensorstore installation to avoid needing Google Cloud Run.
+* Test and deploy cloud-based model hosting and inference on Google AI Platform
+* Use pre-built tensorstore installation to avoid needing Google Cloud Run for pre-computed cloud data fetchiing
