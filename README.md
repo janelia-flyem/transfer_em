@@ -75,7 +75,7 @@ to host the model and perform inference (this workflow is untested):
 * copy the saved model directory to a Google storage bucket
 * upload a python build of transfer_em (see command below) to a Google storage bucket (it can be the same bucket as the saved model)
 
-    % python setup.py sdist --formats=gztar 
+      % python setup.py sdist --formats=gztar 
 
 * load the model into the AI platform [here](https://console.cloud.google.com/ai-platform/models)
 * create a version of that model following the UI prompts (options: python 3.7, Custom Prediction Routines,
