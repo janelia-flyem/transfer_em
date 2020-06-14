@@ -1,3 +1,8 @@
+"""Implements prediction by calling Google Cloud Platform.
+
+Note: tensorflow is not needed to run this module.
+"""
+
 import json
 import googleapiclient.discovery
 import numpy as np

@@ -78,6 +78,7 @@ def generate_images(orig, pred):
 
     Args:
         orig (tf.tensor): [b, z-opt, y, x, nch]
+        pred (tf.tensor): [b, z-opt, y, x, nch]
     """
     import matplotlib.pyplot as plt
     

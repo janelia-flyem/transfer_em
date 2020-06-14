@@ -19,13 +19,21 @@ from .debug import generate_images, accuracy
 class EM2EM(object):
     """Creates CGAN model for 1-channenl 2d or 3d data and provides functions to train and predict.
 
-    Recommended 2D input is 128x128 or 256x256
+    Compatible tensor dimension sizes for 2D or 3D are:
 
-    Recommended 3D input is 32x32x32 or 40x40x40
+    132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452, 460, 468, 476, 484, 492, 500, 508
     """
 
     def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8):
-        """Create model.
+        """Creates model or loads from latest checkpoint for the given exp_name or from the supplied checkpoint.
+
+        Args:
+            dimsize (int): dimension size of the input tensor (must be one of the valid sizes)
+            exp_name (str): name of the model
+            is3d (boolean): true for 3d tensor, otherwise a 2d tensor
+            norm_type (str): type of normalization (DEPRECATED -- currently disabled)  
+            ckpt_restore (str): path for checkpoint
+            wf (int): width factor to decrease the default network width (default=8) (should be 1,2,4,8,16,32)
         """
 
         if dimsize < 132:
@@ -73,8 +81,7 @@ class EM2EM(object):
         if ckpt_restore is not None:
           self.ckpt.restore(ckpt_restore).assert_existing_objects_matched()
           print (f"checkpoint {ckpt_restore} restored")
-
-        if self.ckpt_manager.latest_checkpoint:
+        elif self.ckpt_manager.latest_checkpoint:
           self.ckpt.restore(self.ckpt_manager.latest_checkpoint).assert_existing_objects_matched() #.assert_consumed()
           print ('Latest checkpoint restored!!')
 

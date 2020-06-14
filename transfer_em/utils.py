@@ -10,6 +10,21 @@ import json
 import os
 
 def predict_cube_from_saved_model(location, start, size, cloudrun, model_dir, fetch_input=False):
+    """Runs prediction on a saved model for a subvolume.
+
+    This function automatically takes care of image paddding issues and stitching
+    predicted regions together to create the subvolume.
+
+    Args:
+        location (str): cloud directory (only supports ng precomputed) where data is stored
+        start (tuple): (x,y,z) start location
+        size (tuple): (xsize, ysize, zsize) subvolume size
+        cloudrun (str): location of cloud run serving source data
+        model_dir (str): directory of saved model
+        fetch_input (boolean): return input and output instead of just input
+    Returns:
+        numpy 3D input (optional), numpy3D output  
+    """
 
     meta_path = os.path.join(model_dir, 'meta.json')
     model = tf.keras.models.load_model(model_dir, compile=False)
@@ -24,11 +39,24 @@ def predict_cube_from_saved_model(location, start, size, cloudrun, model_dir, fe
 
 
 def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun=None, fetch_input=False, outdimsize=None, buffer=None):
-    """Predict specified subvolume.
+    """Predict specified subvolume from already loaded file..
 
-    This function automatically fetches data with proper context to predict the specified region.
+    Note: this is like predict_cube_from_saved_model but the model has already be initialized.
 
-    Note: start and size is specified as X, Y, Z values.
+
+    Args:
+        location (str): cloud directory (only supports ng precomputed) where data is stored
+        start (tuple): (x,y,z) start location
+        size (tuple): (xsize, ysize, zsize) subvolume size
+        model (cgan object): object for cgan model
+        meanstd_x (tuple): mean, variance for X domain
+        meanstd_y (tuple): mean, variance for Y target domain
+        cloudrun (str): location of cloud run serving source data
+        fetch_input (boolean): return input and output instead of just input
+        outdimsize (int): allow overwrite with specific outdimsize
+        buffer (int): allow overwrite with specific buffer size
+    Returns:
+        numpy 3D input (optional), numpy3D output  
     """
   
     if outdimsize is None:
