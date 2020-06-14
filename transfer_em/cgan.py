@@ -24,7 +24,7 @@ class EM2EM(object):
     Recommended 3D input is 32x32x32 or 40x40x40
     """
 
-    def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None):
+    def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8):
         """Create model.
         """
 
@@ -34,11 +34,11 @@ class EM2EM(object):
         # enable parallel training
         #self.strategy = tf.distribute.MirroredStrategy()
         #with self.strategy.scope():
-        self.discriminator_x = discriminator(is3d, norm_type=norm_type)
-        self.discriminator_y = discriminator(is3d, norm_type=norm_type)
+        self.discriminator_x = discriminator(is3d, norm_type=norm_type, wf=wf)
+        self.discriminator_y = discriminator(is3d, norm_type=norm_type, wf=wf)
         
-        self.generator_g, dimsize2 = unet_generator(dimsize, is3d, norm_type=norm_type)
-        self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type)
+        self.generator_g, dimsize2 = unet_generator(dimsize, is3d, norm_type=norm_type, wf=wf)
+        self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type, wf=wf)
         # dimsize2 should always be even
         assert((dimsize2 % 2) == 0)
         self.buffer = (dimsize - dimsize2) // 2
