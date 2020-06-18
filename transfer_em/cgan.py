@@ -15,6 +15,7 @@ import time
 from .models.discriminator import *
 from .models.generator import *
 from .debug import generate_images, accuracy
+import numpy as np
 
 class EM2EM(object):
     """Creates CGAN model for 1-channenl 2d or 3d data and provides functions to train and predict.
@@ -199,7 +200,7 @@ class EM2EM(object):
         self.discriminator_y_optimizer.apply_gradients(zip(discriminator_y_gradients,
                                                 self.discriminator_y.trainable_variables))
 
-        return total_gen_g_loss
+        return total_gen_g_loss, total_gen_f_loss, disc_y_loss, disc_x_loss, total_cycle_loss
 
     def plot_discriminator(self, location):
         """Plot discriminator.
@@ -233,13 +234,13 @@ class EM2EM(object):
                         loss = self.train_step(data_f, data_g)
                         pbar.update(1)
             else:
-                loss = tf.constant(0.0)
+                loss = np.zeros((5), dtype=np.float32)
                 count = 0
                 for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
                     loss += self.train_step(data_f, data_g)
                     count += 1
                 loss = loss / count
-                print(f"Epoch {epoch+1} loss: {loss.numpy()}")
+                print(f"Epoch {epoch+1} loss [g_gen, f_gen, disc_y, disc_x, cycle]: {loss}")
 
             if (epoch + 1) % 1 == 0:
                 self.make_checkpoint(epoch+1)
