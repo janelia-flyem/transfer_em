@@ -56,7 +56,7 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None, array=
     return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
 
 
-def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
+def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None, sample_array=False):
     """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from ng precomputed randomly from given bounding box or from provided list of ROIs.
 
@@ -82,7 +82,7 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
             raise Exception("tensorstore not installed")
 
     def generator():
-        if array is not None:
+        if array is not None and sample_array == False:
             for start in array:
                 yield start
         else:
@@ -91,10 +91,16 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None):
                 tf.random.set_seed(seed)
 
             while True:
+                curr_bbox = bbox
+                if array is not None:
+                    spot = tf.random.uniform(shape=[], minval=0, maxval=len(array), dtype=tf.int64, seed=seed)
+                    curr_bbox = array[spot]
+
                 #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
-                xstart = tf.random.uniform(shape=[], minval=bbox[0][0], maxval=bbox[1][0], dtype=tf.int64, seed=seed)
-                ystart = tf.random.uniform(shape=[], minval=bbox[0][1], maxval=bbox[1][1], dtype=tf.int64, seed=seed)
-                zstart = tf.random.uniform(shape=[], minval=bbox[0][2], maxval=bbox[1][2], dtype=tf.int64, seed=seed)
+
+                xstart = tf.random.uniform(shape=[], minval=curr_bbox[0][0], maxval=curr_bbox[1][0], dtype=tf.int64, seed=seed)
+                ystart = tf.random.uniform(shape=[], minval=curr_bbox[0][1], maxval=curr_bbox[1][1], dtype=tf.int64, seed=seed)
+                zstart = tf.random.uniform(shape=[], minval=curr_bbox[0][2], maxval=curr_bbox[1][2], dtype=tf.int64, seed=seed)
                 yield (xstart, ystart, zstart)
        
     location_arr = location.split('/')

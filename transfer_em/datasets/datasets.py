@@ -67,7 +67,7 @@ def create_dataset_from_tensors(tensors, custom_map=None, batch_size=BATCH_SIZE,
     return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd
 
 def create_dataset_from_generator(dataset, shape, custom_map=None, batch_size=BATCH_SIZE, epoch_size=EPOCH_SIZE,
-        global_adjust=True, meanstd=None, padding=None):
+        global_adjust=True, meanstd=None, padding=None, enable_augmentation=False):
     """Takes a dataset from a function generator that should fetch 2D or 3D data.  Scaling is done if enabled.
     
     In this approach, the generator should be able to fetch an arbitrarily large number
@@ -85,7 +85,7 @@ def create_dataset_from_generator(dataset, shape, custom_map=None, batch_size=BA
         global_adjut (boolean): if true, the tensors will be scaled by a global or specified mean/stddev
         meanstd (tuple): mean, stddev if specified is used for scaling, otherwise computer from set of tensors
         padding (int): adds reflection padding of given size if specified
-
+        enable_augmentation (boolean): if true, the tensors will be randomly flipped for each epoch
     Returns:
         4D or 5D tensor (batch, ..., ch) with batches determined by batch size
     """
@@ -112,6 +112,9 @@ def create_dataset_from_generator(dataset, shape, custom_map=None, batch_size=BA
         # apply to dataset
         dataset = dataset.map(lambda x: standardize_population(x, meanstd), num_parallel_calls=AUTOTUNE)
 
+    if enable_augmentation:
+        dataset = dataset.map(augment)
+    
     # shuffle dataset, batch, prefetch
     return dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE), meanstd
 
