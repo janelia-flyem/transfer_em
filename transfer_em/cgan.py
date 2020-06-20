@@ -76,7 +76,7 @@ class EM2EM(object):
                                    discriminator_x_optimizer=self.discriminator_x_optimizer,
                                    discriminator_y_optimizer=self.discriminator_y_optimizer)
 
-        self.ckpt_manager = tf.train.CheckpointManager(self.ckpt, checkpoint_path, max_to_keep=5)
+        self.ckpt_manager = tf.train.CheckpointManager(self.ckpt, checkpoint_path, max_to_keep=50)
 
         # if a checkpoint exists, restore the latest checkpoint.
         if ckpt_restore is not None:
@@ -200,7 +200,7 @@ class EM2EM(object):
         self.discriminator_y_optimizer.apply_gradients(zip(discriminator_y_gradients,
                                                 self.discriminator_y.trainable_variables))
 
-        return total_gen_g_loss, total_gen_f_loss, disc_y_loss, disc_x_loss, total_cycle_loss
+        return total_gen_g_loss, total_gen_f_loss, disc_y_loss, disc_x_loss, gen_g_loss, gen_f_loss, total_cycle_loss
 
     def plot_discriminator(self, location):
         """Plot discriminator.
@@ -212,7 +212,7 @@ class EM2EM(object):
         """
         tf.keras.utils.plot_model(self.generator_f, show_shapes=True, expand_nested=True, to_file=location)
     
-    def train(self, train_input, train_target, epochs=3000, start=0, debug=False, sample=None, sample_gt=None, enable_eager=False, num_samples=4096):
+    def train(self, train_input, train_target, epochs=3000, start=0, debug=False, sample=None, sample_gt=None, enable_eager=False, num_samples=4096, check_freq=1):
         """Main function for training model.  This can be run iteratively but re-training will overwrite
         previous saved checkpoints unless 'start' is set.
 
@@ -234,15 +234,15 @@ class EM2EM(object):
                         loss = self.train_step(data_f, data_g)
                         pbar.update(1)
             else:
-                loss = np.zeros((5), dtype=np.float32)
+                loss = np.zeros((7), dtype=np.float32)
                 count = 0
                 for data_f, data_g in tf.data.Dataset.zip((train_input, train_target)):
                     loss += self.train_step(data_f, data_g)
                     count += 1
                 loss = loss / count
-                print(f"Epoch {epoch+1} loss [g_gen, f_gen, disc_y, disc_x, cycle]: {loss}")
+                print(f"Epoch {epoch+1} loss [g_gen_total, f_gen_total, disc_y, disc_x, cycle, g_gen_only, f_gen_only]: {loss}")
 
-            if (epoch + 1) % 1 == 0:
+            if (epoch + 1) % check_freq == 0:
                 self.make_checkpoint(epoch+1)
                 # show sample image
                 if debug and sample is not None:
