@@ -22,7 +22,7 @@ class EM2EM(object):
 
     Compatible tensor dimension sizes for 2D or 3D are:
 
-    132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452, 460, 468, 476, 484, 492, 500, 508
+    74 
     """
 
     def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8):
@@ -37,8 +37,8 @@ class EM2EM(object):
             wf (int): width factor to decrease the default network width (default=8) (should be 1,2,4,8,16,32)
         """
 
-        if dimsize < 132:
-            raise RuntimeError("minimum dimension allowed is 132")
+        if dimsize < 74:
+            raise RuntimeError("minimum dimension allowed is 74")
 
         # enable parallel training
         #self.strategy = tf.distribute.MirroredStrategy()

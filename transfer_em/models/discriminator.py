@@ -15,7 +15,7 @@ from .utils import *
 def discriminator(is3d=True, norm_type='instancenorm', wf=8):
     """PatchGan discriminator model similar to https://arxiv.org/abs/1611.07004.
 
-    2d images should probably be less than 256x256.  3D volumes should be <=40x40
+    2d images should probably be less than 256x256.  3D volumes should be >=40x40
 
     Args:
         is3d: true=3d tensor; false=2d tensor
@@ -29,28 +29,26 @@ def discriminator(is3d=True, norm_type='instancenorm', wf=8):
     initializer = tf.random_normal_initializer(0., 0.02)
 
     if is3d:
-        inp = tf.keras.layers.Input(shape=[None, None, None, 1], name='input_image')
+        inp = tf.keras.layers.Input(shape=[None, None, None, 1], name='input_image') # 40
     else:
         inp = tf.keras.layers.Input(shape=[None, None, 1], name='input_image')
     x = inp
 
     # 3 downsamples (conv + strided conv downsample)
-    down, _ = downsample("1", 1, 64//wf, is3d, norm_type=norm_type, apply_norm=False)
+    down, _ = downsample("1", 1, 64//wf, is3d, norm_type=norm_type, apply_norm=False) # 18
     down1 = down(x)
-    down, _ = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type)
+    down, _ = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type) # 7
     down2 = down(down1)
-    down, _ = downsample("3", 128//wf, 256//wf, is3d, norm_type=norm_type)
-    down3 = down(down2)
 
     # valid convolution
     if is3d:
         conv = tf.keras.layers.Conv3D(
-          512//wf, 3, strides=1, kernel_initializer=initializer,
-          use_bias=False)(down3)  # (bs, 28, 28, 512)
+          256//wf, 3, strides=1, kernel_initializer=initializer,
+          use_bias=False)(down2)  # 5
     else:
         conv = tf.keras.layers.Conv2D(
-          512//wf, 3, strides=1, kernel_initializer=initializer,
-          use_bias=False)(down3)  # (bs, 28, 28, 512)
+          256//wf, 3, strides=1, kernel_initializer=initializer,
+          use_bias=False)(down2) 
 
     """
     if norm_type.lower() == 'batchnorm':
@@ -65,11 +63,11 @@ def discriminator(is3d=True, norm_type='instancenorm', wf=8):
     if is3d:
         last = tf.keras.layers.Conv3D(
           1, 3, strides=1,
-          kernel_initializer=initializer)(leaky_relu)  # (bs, 26, 26, 1)
+          kernel_initializer=initializer)(leaky_relu)  # 3
     else:
         last = tf.keras.layers.Conv2D(
           1, 3, strides=1,
-          kernel_initializer=initializer)(leaky_relu)  # (bs, 26, 26, 1)
+          kernel_initializer=initializer)(leaky_relu)
 
     return tf.keras.Model(inputs=inp, outputs=last)
 

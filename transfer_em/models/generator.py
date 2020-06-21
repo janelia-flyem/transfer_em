@@ -15,9 +15,9 @@ import tensorflow as tf
 from .utils import *
 
 # technically invalid sizes will still work but off-by-one problems could arise
-VALID_DIMS = [132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452, 460, 468, 476, 484, 492, 500, 508]
+VALID_DIMS = [74]
 
-VALID_OUT = [76, 84, 92, 100, 108, 116, 124, 132, 140, 148, 156, 164, 172, 180, 188, 196, 204, 212, 220, 228, 236, 244, 252, 260, 268, 276, 284, 292, 300, 308, 316, 324, 332, 340, 348, 356, 364, 372, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452]
+VALID_OUT = [40]
 
 def unet_generator(dimsize, is3d=True, norm_type='instancenorm', wf=8):
     """Modified u-net generator model based on https://arxiv.org/abs/1611.07004.
@@ -45,36 +45,31 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm', wf=8):
         inputs = tf.keras.layers.Input(shape=[None, None, 1])
 
     x = inputs
+    curr_dim = dimsize # 74
 
-    curr_dim = dimsize
+    # downsample 4 times
 
-    # downsample 4 time
-    down, skip = downsample("1", 1, 64//wf, is3d, apply_norm=False)
-    skip0 = skip(inputs)
-    down1 = down(inputs)
-    curr_dim = curr_dim - 2
+    # add an extra 3x3 convolution at beginning
+    if is3d:
+        x = tf.keras.layers.Conv3D(64//wf, 3, strides=1, kernel_initializer=initializer, use_bias=False)(x)
+    else:
+        x = tf.keras.layers.Conv2D(64//wf, 3, strides=1, kernel_initializer=initializer, use_bias=False)(x)
+    x = tf.keras.layers.LeakyReLU()(x)
+    curr_dim = curr_dim - 2 # 72
+
+    down, skip = downsample("1", 64//wf, 64//wf, is3d, apply_norm=False)
+    skip0 = skip(x)
+    down1 = down(x)
+    curr_dim = curr_dim - 2 # 70
     skip0_dim = curr_dim
-    curr_dim = (curr_dim // 2) - 1
+    curr_dim = (curr_dim // 2) - 1 # 34
 
     down, skip = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type)
     skip1 = skip(down1)
     down2 = down(down1)
-    curr_dim = curr_dim - 2
+    curr_dim = curr_dim - 2 # 32
     skip1_dim = curr_dim
-    curr_dim = (curr_dim // 2) - 1
-   
-    down, skip = downsample("3", 128//wf, 256//wf, is3d, norm_type=norm_type)
-    skip2 = skip(down2)
-    down3 = down(down2)
-    curr_dim = curr_dim - 2
-    skip2_dim = curr_dim
-    curr_dim = (curr_dim // 2) - 1
-
-    #down, skip = downsample("4", 256, 512, is3d, norm_type=norm_type)
-    #skip3 = skip(down3)
-    #down4 = down(down3)
-    #skip3_dim = curr_dim - 2
-    #curr_dim = (curr_dim // 2) - 1
+    curr_dim = (curr_dim // 2) - 1 # 15
 
     def concat(x, skip, dim_dn, dim_up):
         crop1 = (dim_dn - dim_up) // 2
@@ -90,30 +85,34 @@ def unet_generator(dimsize, is3d=True, norm_type='instancenorm', wf=8):
         x = tf.keras.layers.Concatenate()([x, skip_cropped])
         return x
 
-    # upsample 4 timee
-    #up3 = upsample("4", 512, 512, is3d, norm_type=norm_type, apply_dropout=True)(down4)
-    #curr_dim = (curr_dim - 2) * 2 
-    #up3_cat = concat(up3, skip3, skip3_dim, curr_dim)
+    # upsample 2 times
 
-    up2 = upsample("3", 256//wf, 256//wf, is3d, norm_type=norm_type, apply_dropout=True)(down3)
-    #up2 = upsample("3", 1024, 256, is3d, norm_type=norm_type, apply_dropout=True)(up3_cat)
-    curr_dim = (curr_dim - 2) * 2 
-    up2_cat = concat(up2, skip2, skip2_dim, curr_dim)
-    
-    up1 = upsample("2", 512//wf, 128//wf, is3d, norm_type=norm_type, apply_dropout=True)(up2_cat)
-    curr_dim = (curr_dim - 2) * 2 
+    up1 = upsample("2", 128//wf, 128//wf, is3d, norm_type=norm_type, apply_dropout=True)(down2)
+    curr_dim = (curr_dim - 2) * 2 # 26
     up1_cat = concat(up1, skip1, skip1_dim, curr_dim)
-    
-    up0 = upsample("1", 256//wf, 64//wf, is3d, norm_type=norm_type, apply_dropout=True)(up1_cat)
-    curr_dim = (curr_dim - 2) * 2 
+   
+    # add an extra 3x3 convolution in between
+    if is3d:
+        x = tf.keras.layers.Conv3D(256//wf, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up1_cat)
+    else:
+        x = tf.keras.layers.Conv2D(256//wf, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up1_cat)
+    x = tf.keras.layers.LeakyReLU()(x)
+    curr_dim -= 2 # 24
+
+    up0 = upsample("1", 256//wf, 64//wf, is3d, norm_type=norm_type, apply_dropout=True)(x)
+    curr_dim = (curr_dim - 2) * 2 # 44 
     up0_cat = concat(up0, skip0, skip0_dim, curr_dim)
 
     # add a 1x1 convolution at the end instad? 
     if is3d:
-        x = tf.keras.layers.Conv3D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
+        x = tf.keras.layers.Conv3D(128//wf, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
+        x = tf.keras.layers.LeakyReLU()(x)
+        x = tf.keras.layers.Conv3D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(x)
     else:
-        x = tf.keras.layers.Conv2D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
-    curr_dim -= 2
+        x = tf.keras.layers.Conv2D(128//wf, 3, strides=1, kernel_initializer=initializer, use_bias=False)(up0_cat)
+        x = tf.keras.layers.LeakyReLU()(x)
+        x = tf.keras.layers.Conv2D(1, 3, strides=1, kernel_initializer=initializer, use_bias=False)(x)
+    curr_dim -= 4 # 40
 
     return tf.keras.Model(inputs=inputs, outputs=x), curr_dim
 
