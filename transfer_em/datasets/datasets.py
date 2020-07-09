@@ -102,7 +102,7 @@ def create_dataset_from_generator(dataset, shape, custom_map=None, batch_size=BA
     if custom_map is not None:
         dataset = dataset.map(custom_map, num_parallel_calls=AUTOTUNE)
 
-    dataset= dataset.take(epoch_size)
+    dataset = dataset.take(epoch_size)
 
     # use population statistics to standardize to the population 
     if global_adjust:
@@ -144,6 +144,13 @@ def augment(tensor):
         uniform_random = tf.random.uniform([], 0, 1.0)
         if tf.math.less(uniform_random, .5):
             tensor = tf.reverse(tensor, [dim])
+    
+    # intensity vary and variance scale
+    mean_adj = tf.random.uniform([], -0.05, 0.05)
+    var_adj = tf.random.uniform([], 1, 1.05)
+
+    tensor *= var_adj
+    tensor += mean_adj
         
     return tensor
 

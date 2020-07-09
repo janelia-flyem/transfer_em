@@ -104,12 +104,12 @@ class EM2EM(object):
         return self.loss_obj(tf.ones_like(generated), generated)
 
     def identity_loss(self, real_image, same_image):
-        LAMBDA = 10
+        LAMBDA = 1
         loss = tf.reduce_mean(tf.abs(real_image - same_image))
         return LAMBDA * 0.5 * loss
 
     def calc_cycle_loss(self, real_image, cycled_image):
-        LAMBDA = 10
+        LAMBDA = 1
         loss1 = tf.reduce_mean(tf.abs(real_image - cycled_image))
         return LAMBDA * loss1
 
@@ -240,7 +240,7 @@ class EM2EM(object):
                     loss += self.train_step(data_f, data_g)
                     count += 1
                 loss = loss / count
-                print(f"Epoch {epoch+1} loss [g_gen_total, f_gen_total, disc_y, disc_x, cycle, g_gen_only, f_gen_only]: {loss}")
+                print(f"Epoch {epoch+1} loss [g_gen_total, f_gen_total, disc_y, disc_x, g_gen_only, f_gen_only, cycle]: {loss}")
 
             if (epoch + 1) % check_freq == 0:
                 self.make_checkpoint(epoch+1)

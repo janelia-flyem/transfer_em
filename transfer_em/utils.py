@@ -68,8 +68,8 @@ def predict_ng_cube(location, start, size, model, meanstd_x, meanstd_y, cloudrun
     # make sure outdimsize is a multiple of 8
     # (assume always even)
     tpad = 0
-    if (outdimsize // 8) != 0:
-        diff = outdimsize % 8
+    if (outdimsize // 6) != 0:
+        diff = outdimsize % 6
         outdimsize -= diff
         tpad = (diff // 2)
         buffer += tpad 
