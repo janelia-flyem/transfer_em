@@ -56,7 +56,7 @@ def volume3d_dvid(dvid_server, uuid, instance, bbox, size=132, seed=None, array=
     return tf.data.Dataset.from_generator(generator, output_types=(tf.int64, tf.int64, tf.int64)).map(wrapper_mapper, num_parallel_calls=AUTOTUNE) # ideally set to some concurrency that matches DVID's concurrency
 
 
-def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None, sample_array=False):
+def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None, sample_array=False, sample_class=False):
     """Returns a dataset based on a generator that will produce an infinite number of 3D volumes
     from ng precomputed randomly from given bounding box or from provided list of ROIs.
 
@@ -93,8 +93,12 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None, 
             while True:
                 curr_bbox = bbox
                 if array is not None:
-                    spot = tf.random.uniform(shape=[], minval=0, maxval=len(array), dtype=tf.int64, seed=seed)
-                    curr_bbox = array[spot]
+                    tarray = array
+                    if sample_class:
+                        cspot = tf.random.uniform(shape=[], minval=0, maxval=len(array), dtype=tf.int64, seed=seed)
+                        tarray = array[cspot]
+                    spot = tf.random.uniform(shape=[], minval=0, maxval=len(tarray), dtype=tf.int64, seed=seed)
+                    curr_bbox = tarray[spot]
 
                 #  get random starting point from bbox (x1,y1,z1) (x2,y2,z2)
 
