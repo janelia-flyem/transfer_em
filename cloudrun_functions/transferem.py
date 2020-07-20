@@ -29,6 +29,7 @@ def volume():
         location = config_file["location"] # contains source and destination
         start = config_file["start"] # contains source and destination
         size = config_file["size"] # contains source and destination
+        scale_index = config_file.get("scale_index", 0)
         
         location_arr = location.split('/')
         bucket = location_arr[0]
@@ -44,7 +45,7 @@ def volume():
                 },
             'path': path,
             'recheck_cached_data': 'open',
-            'scale_index': 0 
+            'scale_index': scale_index
         }).result()
         dataset = dataset[ts.d['channel'][0]]
 
