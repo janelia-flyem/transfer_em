@@ -30,7 +30,7 @@ The supported endpoints are:
 
 ```json
 {
-	"source": "gs precomputed path like blah/jpeg",
+	"location": "bucket-name/path/to/emdata/raw/jpeg",
 	"start": [0,100,0],
 	"size": [256,256,256]
 }
