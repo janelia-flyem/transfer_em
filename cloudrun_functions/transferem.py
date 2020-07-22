@@ -23,29 +23,7 @@ logger = logging.getLogger(__name__)
 def volume():
     """
     Retrieve volume from tensorstore.
-
-    Example usage:
-
-    corner_xyz = [0, 10, 20]
-    shape_xyz = [100, 200, 300]
-
-    config = {
-        'location': f'{mybucket}/neuroglancer/jpeg',
-        'start': corner_xyz,
-        'size': shape_xyz,
-        'scale_index': 4  # Optional, selects scale
-    }
-
-    r = requests.post(f'https://{service_base_url}/volume', json=config)
-    r.raise_for_status()
-
-    X, Y, Z = shape_xyz
-
-    # C-order, ZYX index
-    block_zyx = np.frombuffer(r.content, dtype=np.uint8).reshape((Z, Y, X))
-
-    # F-order, XYZ index
-    block_xyz = block_zyx.transpose()
+    See fetch_subvolume() function below for client-side example usage.
     """
     try:
         config_file  = request.get_json()
@@ -110,6 +88,67 @@ def volume():
     except Exception as e:
         return Response(traceback.format_exc(), 400)
 
+
+def fetch_subvolume(service_url, location, box_zyx, scale_index=0, dtype=None):
+    """
+    Example client function to fetch 3D subvolumes.
+
+    Args:
+        service_url:
+            CloudRun URL, e.g. https://transferem-qdoifjasf23jk348-uk.a.run.app
+
+        location:
+            bucket location of the data, e.g. gs://mybucket/neuroglancer/jpeg
+
+        box_zyx:
+            (start_zyx, stop_xyz)
+            Subvolume start/stop corners, in ZYX order
+
+        scale_index:
+            Which pyramid scale to read data from.
+
+        dtype:
+            Must match the dtype of the remote volume.
+            Default is np.uint8
+
+    Returns:
+        ndarray, ZYX-indexed, C-order
+        (If desired, transpose to get XYZ-index, F-order)
+    """
+    import numpy as np
+
+    assert not service_url.startswith('http://'), \
+        "service must start with https://"
+
+    if not service_url.startswith('https'):
+        service_url = f'https://{service_url}'
+
+    if location.startswith('gs://'):
+        location = location[len('gs://'):]
+
+    dtype = dtype or np.uint8
+
+    box_zyx = np.asarray(box_zyx)
+    assert box_zyx.shape == (2,3), "subvolume must be 3D"
+
+    # REST API expects XYZ order
+    box_xyz = box_zyx[:, ::-1]
+    shape_xyz = box_xyz[1] - box_xyz[0]
+
+    config = {
+        'location': location,
+        'start': box_xyz[0].tolist(),
+        'size': shape_xyz.tolist(),
+        'scale_index': scale_index
+    }
+
+    r = requests.post(f'{service_url}/volume', json=config)
+    r.raise_for_status()
+
+    data = np.frombuffer(r.content, dtype=dtype)
+
+    X, Y, Z = shape_xyz
+    return data.reshape((Z, Y, X))
 
 if __name__ == "__main__":
     app.run(debug=True,host='0.0.0.0',port=int(os.environ.get('PORT', 8080)))
