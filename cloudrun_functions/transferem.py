@@ -28,7 +28,11 @@ def volume():
     try:
         config_file  = request.get_json()
 
+        # Strip gs:// prefix
         location = config_file["location"] # contains source and destination
+        if location.startswith('gs://'):
+            location = location[len('gs://'):]
+
         start = config_file["start"] # in XYZ order
         size = config_file["size"] # in XYZ order
         scale_index = config_file.get("scale_index", 0)
@@ -122,9 +126,6 @@ def fetch_subvolume(service_url, location, box_zyx, scale_index=0, dtype=None):
 
     if not service_url.startswith('https'):
         service_url = f'https://{service_url}'
-
-    if location.startswith('gs://'):
-        location = location[len('gs://'):]
 
     dtype = dtype or np.uint8
 
