@@ -11,6 +11,7 @@
 # ex: https://github.com/tensorflow/docs/blob/master/site/en/tutorials/distribute/custom_training.ipynb)
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 import time
 from .models.discriminator import *
 from .models.generator import *
@@ -25,7 +26,7 @@ class EM2EM(object):
     74 
     """
 
-    def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8):
+    def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8, focal_gamma=2):
         """Creates model or loads from latest checkpoint for the given exp_name or from the supplied checkpoint.
 
         Args:
@@ -62,7 +63,11 @@ class EM2EM(object):
         self.is3d = is3d
 
         # setup loss functions
-        self.loss_obj = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        #self.loss_obj = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        self.loss_obj = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True, alpha=0.5, gamma=focal_gamma,
+                reduction=tf.keras.losses.Reduction.AUTO)
+        self.loss_obj_nl = tfa.losses.SigmoidFocalCrossEntropy(from_logits=False, alpha=0.5, gamma=focal_gamma,
+                reduction=tf.keras.losses.Reduction.AUTO)
 
         # establish checkpoints
         checkpoint_path = f"./checkpoints/train_{exp_name}"
@@ -92,27 +97,38 @@ class EM2EM(object):
 
 
     def discriminator_loss(self, real, generated):
-        real_loss = self.loss_obj(tf.ones_like(real), real)
+        real_loss = self.loss_obj(tf.ones_like(real), real) * 2
 
-        generated_loss = self.loss_obj(tf.zeros_like(generated), generated)
+        generated_loss = self.loss_obj(tf.zeros_like(generated), generated) * 2
 
         total_disc_loss = real_loss + generated_loss
 
         return total_disc_loss * 0.5
 
     def generator_loss(self, generated):
-        return self.loss_obj(tf.ones_like(generated), generated)
+        return self.loss_obj(tf.ones_like(generated), generated) * 2
 
     def identity_loss(self, real_image, same_image):
+        """
         LAMBDA = 1
         loss = tf.reduce_mean(tf.abs(real_image - same_image))
         return LAMBDA * 0.5 * loss
+        """
+        LAMBDA = 2
+        tconf = 1 - tf.abs(real_image - same_image)/2
+        loss = self.loss_obj_nl(tf.ones_like(tconf), tconf) * 2
+        return LAMBDA * 0.5 * loss
 
     def calc_cycle_loss(self, real_image, cycled_image):
+        """
         LAMBDA = 1
-        loss1 = tf.reduce_mean(tf.abs(real_image - cycled_image))
-        return LAMBDA * loss1
-
+        loss = tf.reduce_mean(tf.abs(real_image - cycled_image))
+        return LAMBDA * loss
+        """
+        LAMBDA = 2
+        tconf = 1 - tf.abs(real_image - cycled_image)/2
+        loss = self.loss_obj_nl(tf.ones_like(tconf), tconf) * 2
+        return LAMBDA * loss
 
     @tf.function
     def train_step(self, real_x, real_y):
