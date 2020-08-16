@@ -18,6 +18,17 @@ from .models.generator import *
 from .debug import generate_images, accuracy
 import numpy as np
 
+def create_prior_helper(prior_h5, last_layer):
+    """Create model based on top layers (until specified last layer).
+
+    Note: the model is set to untrainable.
+    """
+
+    model = tf.keras.models.load_model(prior_h5, compile=False)
+    modelx = tf.keras.Model(inputs=model.input, outputs=model.layers[last_layer].output)    
+    modelx.trainable = False
+    return modelx
+
 class EM2EM(object):
     """Creates CGAN model for 1-channenl 2d or 3d data and provides functions to train and predict.
 
@@ -26,7 +37,7 @@ class EM2EM(object):
     74 
     """
 
-    def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8, focal_gamma=2):
+    def __init__(self, dimsize, exp_name, is3d=True, norm_type="instancenorm", ckpt_restore=None, wf=8, focal_gamma=2, disc_prior=None):
         """Creates model or loads from latest checkpoint for the given exp_name or from the supplied checkpoint.
 
         Args:
@@ -45,7 +56,7 @@ class EM2EM(object):
         #self.strategy = tf.distribute.MirroredStrategy()
         #with self.strategy.scope():
         self.discriminator_x = discriminator(is3d, norm_type=norm_type, wf=wf)
-        self.discriminator_y = discriminator(is3d, norm_type=norm_type, wf=wf)
+        self.discriminator_y = discriminator(is3d, norm_type=norm_type, wf=wf, disc_prior=disc_prior)
         
         self.generator_g, dimsize2 = unet_generator(dimsize, is3d, norm_type=norm_type, wf=wf)
         self.generator_f, _ = unet_generator(dimsize, is3d, norm_type=norm_type, wf=wf)
