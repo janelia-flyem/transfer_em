@@ -153,7 +153,7 @@ def volume3d_ng(location, bbox, size=132, seed=None, array=None, cloudrun=None, 
                 raise RuntimeError("cloud run failed")
             data = np.fromstring(res.content, dtype=np.uint8)
             data = data.reshape((size,size,size))
-            data = data.transpose((2,1,0))
+            #data = data.transpose((2,1,0))
             return tf.convert_to_tensor(data, dtype=tf.uint8)
             
     #@tf.function
