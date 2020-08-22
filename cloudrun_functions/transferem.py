@@ -7,17 +7,72 @@ from flask import Flask, Response, request, make_response, abort
 from flask_cors import CORS
 import json
 import logging
+from PIL import Image
 import pwd
 import numpy as np
 import tensorstore as ts
 import traceback
 import sys
+import io
 
 app = Flask(__name__)
 
 # TODO: Limit origin list here: CORS(app, origins=[...])
 CORS(app)
 logger = logging.getLogger(__name__)
+
+#@app.route('/slice/<string:location>/<string:startstr>/<string:sizestr>/<string:format>', methods=["GET"])
+#def slice(location, startstr, sizestr, format):
+@app.route('/slice/<string:startstr>/<string:sizestr>/<string:format>', methods=["GET"])
+def slice(startstr, sizestr, format):
+    """
+    Retrieve slice with specified format
+    """
+    try:
+        start_arr = startstr.split("_")
+        start = [int(start_arr[0]), int(start_arr[1]), int(start_arr[2])]
+        
+        size_arr = sizestr.split("_")
+        size = [int(size_arr[0]), int(size_arr[1]), int(size_arr[2])]
+
+        location = request.args.get("location")
+
+        if size[0] != 1 and size[1] != 1 and size[2] != 1:
+            return Response("one dimension must be size 1", 400)
+
+        location_arr = location.split('/')
+        bucket = location_arr[0]
+        path = '/'.join(location_arr[1:])
+        stderr = sys.stderr
+
+        # reuse tensorstore object
+        dataset = ts.open({
+            'driver': 'neuroglancer_precomputed',
+            'kvstore': {
+                'driver': 'gcs',
+                'bucket': bucket,
+                },
+            'path': path,
+            'recheck_cached_data': 'open'
+        }).result()
+        dataset = dataset[ts.d['channel'][0]]
+
+        x, y, z = start
+        sx, sy, sz = size
+        data = dataset[x:x+sx, y:y+sy, z:z+sz].read(order='F').result()
+        
+        # write 2D image to jpeg or png
+        data = np.squeeze(data)
+        imgByteArr = io.BytesIO()
+        im = Image.fromarray(data.transpose((1,0)))
+        im.save(imgByteArr, format=format)
+        r = make_response(imgByteArr.getvalue())
+        r.headers.set('Content-Type', f"image/{format}")
+        return r
+
+    except Exception as e:
+        return Response(traceback.format_exc(), 400)
+
 
 @app.route('/volume', methods=["POST"])
 def volume():
@@ -36,6 +91,7 @@ def volume():
         start = config_file["start"] # in XYZ order
         size = config_file["size"] # in XYZ order
         scale_index = config_file.get("scale_index", 0)
+        use_jpeg = config_file.get("jpeg", False)
 
         location_arr = location.split('/')
         bucket = location_arr[0]
@@ -86,9 +142,20 @@ def volume():
         x, y, z = start
         sx, sy, sz = size
         data = dataset[x:x+sx, y:y+sy, z:z+sz].read(order='F').result()
-        r = make_response(data.tobytes(order='F'))
-        r.headers.set('Content-Type', 'application/octet-stream')
-        return r
+        if not use_jpeg or sz > 1:
+            r = make_response(data.tobytes(order='F'))
+            r.headers.set('Content-Type', 'application/octet-stream')
+            return r
+        else:
+            # write 2D image to JPEG
+            data = np.squeeze(data)
+            imgByteArr = io.BytesIO()
+            im = Image.fromarray(data.transpose((1,0)))
+            im.save(imgByteArr, format="JPEG")
+            r = make_response(imgByteArr.getvalue())
+            r.headers.set('Content-Type', 'image/jpeg')
+            return r
+
     except Exception as e:
         return Response(traceback.format_exc(), 400)
 
