@@ -22,8 +22,8 @@ TEMP_NG_DIR = "flyem_public_cache"
 
 # TODO:
 # Note: Custom does not work with GPU so is somewhat limited currently
-# Make authenticated cloud run calls
-# Fix authorization issues for cloud storage writing
+# Make authenticated cloud run calls -- might need to pass token as payload
+# Fix authorization issues for cloud storage writing -- might need to pass token as payload
 
 class TransferEMPredictor(object):
     """Prediction utility from tranfering EM to another EM domain.
@@ -70,7 +70,7 @@ class TransferEMPredictor(object):
             #token = subprocess.check_output(["gcloud auth print-identity-token"], shell=True).decode()
             
             headers = {}
-            headers["Authorization"] = f"Bearer {token[:-1]}"
+            #headers["Authorization"] = f"Bearer {token[:-1]}"
             headers["Content-type"] = "application/json" 
 
             config = {"location": location, "size": [size[0]+2*self.buffer, size[1]+2*self.buffer, size[2]+2*self.buffer], "start": [start[0]-self.buffer, start[1]-self.buffer, start[2]-self.buffer]}
