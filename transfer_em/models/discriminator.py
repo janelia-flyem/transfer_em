@@ -35,17 +35,17 @@ def discriminator(is3d=True, norm_type='instancenorm', wf=8, disc_prior=None):
     x = inp
 
     # create a simple model with a few downsample layers or reuse a provided model
-    if disc_prior is None:
-        # 3 downsamples (conv + strided conv downsample)
-        down, _ = downsample("1", 1, 64//wf, is3d, norm_type=norm_type, apply_norm=False) # 18
-        down1 = down(x)
-        down, _ = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type) # 7
-        down2 = down(down1)
-        x = down2
+    # 3 downsamples (conv + strided conv downsample)
+    down, _ = downsample("1", 1, 64//wf, is3d, norm_type=norm_type, apply_norm=False) # 18
+    down1 = down(x)
+    down, _ = downsample("2", 64//wf, 128//wf, is3d, norm_type=norm_type) # 7
+    down2 = down(down1)
+    x = down2
 
-    else:
+    if disc_prior is not None:
         # reuse model
-        x = disc_prior(x) 
+        x2 = disc_prior(inp) 
+        x = tf.keras.layers.Concatenate()([x, x2])
 
     # valid convolution
     if is3d:
