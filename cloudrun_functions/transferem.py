@@ -21,6 +21,32 @@ app = Flask(__name__)
 CORS(app)
 logger = logging.getLogger(__name__)
 
+
+from collections import OrderedDict
+class lru_cache:
+    """The cache should be memory limited.
+    For now, prevent caching of images over 1 MB.
+    """
+    def __init__(self, limit=1024):
+        self.cache = OrderedDict()
+        self.limit = limit
+
+    def get(self, img_key):
+        if img_key not in self.cache:
+            raise Exception("Not found")
+        self.cache.move_to_end(img_key)
+        return self.cache[img_key]
+
+    def put(self, img_key, val):
+        if len(val) > 1000000:
+            return
+        self.cache[img_key] = val
+        self.cache.move_to_end(img_key)
+        if len(self.cache) > self.limit:
+            self.cache.popitem(last=False)
+
+SLICE_CACHE = lru_cache()
+
 #@app.route('/slice/<string:location>/<string:startstr>/<string:sizestr>/<string:format>', methods=["GET"])
 #def slice(location, startstr, sizestr, format):
 @app.route('/slice/<string:startstr>/<string:sizestr>/<string:format>', methods=["GET"])
@@ -45,28 +71,34 @@ def slice(startstr, sizestr, format):
         path = '/'.join(location_arr[1:])
         stderr = sys.stderr
 
-        # reuse tensorstore object
-        dataset = ts.open({
-            'driver': 'neuroglancer_precomputed',
-            'kvstore': {
-                'driver': 'gcs',
-                'bucket': bucket,
-                },
-            'path': path,
-            'recheck_cached_data': 'open'
-        }).result()
-        dataset = dataset[ts.d['channel'][0]]
+        cache_key = f"{location}_{startstr}_{sizestr}_{format}"
+        try:
+            resp = SLICE_CACHE.get(cache_key)
+        except Exception:
+            # reuse tensorstore object
+            dataset = ts.open({
+                'driver': 'neuroglancer_precomputed',
+                'kvstore': {
+                    'driver': 'gcs',
+                    'bucket': bucket,
+                    },
+                'path': path,
+                'recheck_cached_data': 'open'
+            }).result()
+            dataset = dataset[ts.d['channel'][0]]
 
-        x, y, z = start
-        sx, sy, sz = size
-        data = dataset[x:x+sx, y:y+sy, z:z+sz].read(order='F').result()
-        
-        # write 2D image to jpeg or png
-        data = np.squeeze(data)
-        imgByteArr = io.BytesIO()
-        im = Image.fromarray(data.transpose((1,0)))
-        im.save(imgByteArr, format=format)
-        r = make_response(imgByteArr.getvalue())
+            x, y, z = start
+            sx, sy, sz = size
+            data = dataset[x:x+sx, y:y+sy, z:z+sz].read(order='F').result()
+            
+            # write 2D image to jpeg or png
+            data = np.squeeze(data)
+            imgByteArr = io.BytesIO()
+            im = Image.fromarray(data.transpose((1,0)))
+            im.save(imgByteArr, format=format)
+            resp = imgByteArr.getvalue()
+            SLICE_CACHE.put(cache_key, resp)
+        r = make_response(resp)
         r.headers.set('Content-Type', f"image/{format}")
         return r
 
