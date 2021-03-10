@@ -27,7 +27,7 @@ class lru_cache:
     """The cache should be memory limited.
     For now, prevent caching of images over 1 MB.
     """
-    def __init__(self, limit=1024):
+    def __init__(self, limit=256):
         self.cache = OrderedDict()
         self.limit = limit
 
